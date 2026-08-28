@@ -12,10 +12,15 @@
 #
 # 운영(NAS Docker)에서는 이 파일을 쓰지 않는다. 개발 PC 전용이다.
 #
+# 버전을 17 로 맞춘 이유: 지금 돌고 있는 PC(이남준 님)가 PostgreSQL 17.11 이다.
+# 17 에서 뜬 백업 dump 는 16 의 pg_restore 가 열지 못한다(아카이브 형식 1.16,
+# "unsupported version" 으로 거절). 개발 DB 가 낮으면 백업을 되돌려 볼 수가 없고,
+# 되돌려 보지 못하는 백업은 백업이라 부르기 어렵다.
+#
 # 127.0.0.1 에만 바인딩한다 — 개발 PC 밖에서는 직접 접속할 수 없다.
 services:
   db-dev:
-    image: postgres:16.14-alpine3.24
+    image: postgres:17.11-alpine
     container_name: dss-meters-postgres-dev
     restart: unless-stopped
     environment:
