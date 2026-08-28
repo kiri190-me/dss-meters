@@ -13,7 +13,7 @@
                           |
                           v
                     /login  (공개 구간)
-        1차: 임시 로그인 폼  →  나중에: 포털로 리다이렉트
+      [DSS 통합 로그인] → 포털 → 콜백에서 검증
                           |
                      세션 쿠키 발급
                           v
@@ -116,9 +116,24 @@
 
 ### 2-5. 로그인 `/login`
 
-- **1차(임시)**: 이름 입력 + 역할 선택(관리자/열람자) → 세션 발급
-  - `DEV_FAKE_LOGIN_ENABLED=true` 일 때만 이 폼이 뜬다. **기본값은 꺼짐.**
-- **나중에**: 버튼 하나 → 포털 `/authorize` 로 리다이렉트
+버튼 하나뿐이다. 아이디도 비밀번호도 받지 않는다.
+
+```
+/login  ──[DSS 통합 로그인]──▶  /api/auth/sso/start
+                                    │  state·nonce·code_verifier 생성
+                                    │  서명한 쿠키(meters_sso_tx)에 담고
+                                    ▼
+                            포털 /api/oidc/authorize
+                                    │  (필요하면 카카오까지)
+                                    ▼
+                      /api/auth/sso/callback ── 검증 ──▶ meters_session 발급 ──▶ 원래 가려던 곳
+```
+
+- 콜백이 거절하면 `/login?error=…` 로 되돌린다. 사유마다 화면 문구가 다르다
+  (`expired` · `unknown_role` · `inactive` · `deleted` · 그 외).
+- 로그아웃은 이 사이트 세션을 끊고 **포털의 `end_session` 까지** 다녀온다.
+- 포털이 먼저 끊을 수도 있다 → `/api/auth/sso/backchannel-logout`
+  (서명 검증 후 그 사람의 `web_sessions` 를 전부 회수)
 
 ### 2-6. 언어 전환
 
@@ -201,7 +216,11 @@
 | `created_at` / `updated_at` + 소프트 삭제 4종 | | |
 
 - 처음 보는 사람이 로그인하면 **자동으로 행을 만들되 역할은 `VIEWER`**.
-- `ADMIN` 승격은 DB에서 직접 (1차에는 화면 없음). 이남준 님 계정은 초기 데이터로 넣는다.
+- `ADMIN` 승격은 **포털에서** 한다 — 포털이 ID 토큰에 실어 보낸 `role` 클레임이
+  로그인할 때마다 이 값을 덮어쓴다. 클레임이 없으면 기존 값을 그대로 둔다.
+  (dss-auth: `npm run client:grant -- --client dss-meters --user <이름> --role ADMIN --by <관리자>`)
+- 통합 로그인 전에 만들어 둔 행은 `auth_sub` 가 가짜라 잇지 않으면 열람자가 새로
+  하나 더 생긴다. `npm run sso:link` 로 사람이 명시적으로 잇는다.
 
 ### 3-4. `web_sessions` — 세션 (서버 저장형)
 
@@ -308,14 +327,14 @@ dss-meters/
    │  │  ├─ page.tsx                계측기 목록
    │  │  └─ meters/[id]/…           상세 · 등록 · 수정
    │  └─ api/
-   │     ├─ auth/                   login · logout · callback(자리)
+   │     ├─ auth/sso/               start · callback · backchannel-logout
    │     └─ photos/[id]/            사진 서빙 (권한 검사)
    ├─ lib/
    │  ├─ auth/                    ← ★ OIDC 연동을 여기에만 가둔다
-   │  │  ├─ session.ts               세션 읽기/쓰기 (여기 한 곳만)
+   │  │  ├─ session.ts               세션 읽기/쓰기/회수 (여기 한 곳만)
    │  │  ├─ guards.ts                requireSession() · requireAdmin()
-   │  │  ├─ dev-login.ts             // dss-auth OIDC 연결 시 폐기 대상
-   │  │  └─ oidc.ts                  discovery · 토큰검증 (나중에 채움)
+   │  │  ├─ oidc.ts                  포털과 이야기하는 유일한 파일
+   │  │  └─ sso-login.ts             포털의 sub 를 web_users 와 잇는다
    │  ├─ db/  schema.ts · index.ts
    │  ├─ i18n/  ko.ts · ja.ts
    │  ├─ audit.ts                    감사 로그 기록
@@ -327,18 +346,24 @@ dss-meters/
 
 ## 7. 환경변수
 
-| 이름 | 1차 값 | 설명 |
+| 이름 | 값 | 설명 |
 |---|---|---|
 | `DATABASE_URL` | `postgres://…/dss_meters` | |
-| `PORT` | `3200` | |
+| `PORT` | `3300` | A/S 3000 · 포털 3100 · dss-home 3200 과 겹치지 않게 |
 | `FILE_STORAGE_ROOT` | `C:\WEB-DATA\dss-meters` | NAS에서는 `/data` |
 | `SESSION_COOKIE_SECURE` | `false` | 사내망 HTTP 단계. HTTPS 붙이면 `true` |
-| `DEV_FAKE_LOGIN_ENABLED` | `true` (개발 중만) | **기본값 꺼짐.** 포털 연결되면 삭제 |
-| `OIDC_ISSUER` / `OIDC_CLIENT_ID` / `OIDC_CLIENT_SECRET` / `OIDC_REDIRECT_URI` | (비움) | 포털 완성 후 |
-| `SMTP_*` | (비움) | 3차 알림용 |
+| `SESSION_HOURS` | `12` | 포털 SSO 세션의 절대 만료를 넘기지 않는다 |
+| `SSO_ISSUER` | `http://<포털 IP>:3100` | ID 토큰의 `iss` 와 글자 단위로 같아야 함 |
+| `SSO_CLIENT_ID` | `dss-meters` | |
+| `SSO_CLIENT_SECRET` | (포털 발급) | 발급 시 한 번만 표시된다 |
+| `SSO_REDIRECT_URI` | `http://<이 PC IP>:3300/api/auth/sso/callback` | 포털 등록값과 글자 단위로 같아야 함 |
+| `SSO_TX_SECRET` | (32자 이상 무작위) | 왕복 쿠키 서명 키 |
+| `SMTP_*` | (비움) | 알림용 |
 
 - 비밀값이 없으면 **조용히 넘어가지 않고 즉시 오류를 낸다.**
 - `client_secret`에 `NEXT_PUBLIC_` 을 붙이지 않는다.
+- 이름을 `SSO_` 로 맞춘 이유: A/S 관리 시스템도 같은 이름을 쓴다. IP 가 바뀌면
+  두 시스템을 같은 방식으로 고칠 수 있어야 한다.
 
 ---
 
@@ -348,7 +373,7 @@ dss-meters/
 |---|---|
 | 1 | 프로젝트 생성 + Next.js 16 문서 확인 + docker compose로 DB 띄우기 |
 | 2 | DB 스키마 작성 → 마이그레이션 **생성** (적용은 승인 후) |
-| 3 | 세션 · 가드 · 임시 로그인 |
+| 3 | 세션 · 가드 · 로그인 (임시 → dss-auth 통합 로그인으로 교체 완료) |
 | 4 | 엑셀 → JSON/사진 추출 + 이관 스크립트 |
 | 5 | 계측기 목록 화면 (검색·필터·색상) |
 | 6 | 상세 화면 + 사진 보기 |

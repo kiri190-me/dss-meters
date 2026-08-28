@@ -8,7 +8,7 @@
  */
 import { createHash, randomBytes } from "node:crypto";
 
-import { and, eq, gt, isNull } from "drizzle-orm";
+import { and, eq, gt, inArray, isNull } from "drizzle-orm";
 import { cookies } from "next/headers";
 
 import { db } from "@/lib/db";
@@ -69,6 +69,35 @@ export async function getSessionUser(): Promise<WebUser | null> {
     .limit(1);
 
   return rows[0]?.user ?? null;
+}
+
+/**
+ * 그 사람의 이 사이트 세션을 전부 끊는다.
+ *
+ * 포털이 백채널 로그아웃으로 "이 사람 끊어라" 라고 알려올 때 쓴다. 세션을
+ * 서버 저장형으로 만든 이유가 바로 이 즉시 회수다 — 서명된 토큰이었다면
+ * 발급된 뒤에는 스스로 유효해서, 포털이 자기 세션을 폐기해도 여기 쿠키는
+ * 그대로 살아 있다.
+ *
+ * 특정 세션 하나가 아니라 그 사람 전부를 끊는다. 공용 PC 에서 로그아웃한
+ * 사람에게는 그편이 기대에 맞고, 정지된 사람에게는 반드시 그래야 한다.
+ */
+export async function revokeSessionsForSubject(authSub: string): Promise<number> {
+  const rows = await db
+    .update(webSessions)
+    .set({ revokedAt: new Date() })
+    .where(
+      and(
+        isNull(webSessions.revokedAt),
+        inArray(
+          webSessions.userId,
+          db.select({ id: webUsers.id }).from(webUsers).where(eq(webUsers.authSub, authSub)),
+        ),
+      ),
+    )
+    .returning({ id: webSessions.id });
+
+  return rows.length;
 }
 
 /** 이 사이트의 세션만 끊는다. (포털 세션은 그대로) */

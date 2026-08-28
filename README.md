@@ -26,7 +26,9 @@ CLAUDE.md 에 지금까지의 진행 상황과 지켜야 할 규칙이 적혀 �
 
 ### 1. 데이터베이스 켜기
 
-PC를 껐다 켜면 PostgreSQL 이 꺼져 있다. 아래를 실행한다.
+PC를 껐다 켜면 PostgreSQL 이 꺼져 있다.
+
+**이남준 님 PC** (PostgreSQL 을 직접 설치해 쓰는 곳):
 
 ```
 "C:\Users\이남준\pgsql\bin\pg_ctl.exe" -D C:\pgdata -l C:\pgdata\server.log start
@@ -38,6 +40,12 @@ PC를 껐다 켜면 PostgreSQL 이 꺼져 있다. 아래를 실행한다.
 "C:\Users\이남준\pgsql\bin\pg_ctl.exe" -D C:\pgdata status
 ```
 
+**도커를 쓰는 개발 PC** (`docker-compose.yml` 이 있는 곳):
+
+```
+npm run db:up      # 끄기는 npm run db:down
+```
+
 ### 2. 웹사이트 켜기
 
 ```
@@ -45,10 +53,15 @@ cd C:\Users\이남준\dss-meters
 npm run dev
 ```
 
-브라우저에서 **http://localhost:3200** 으로 접속한다.
+브라우저에서 **http://localhost:3300** 으로 접속한다.
 
-같은 사무실의 다른 PC 에서 보려면 `http://<이 PC 의 IP>:3200` 으로 접속한다.
-(윈도우 방화벽에서 3200 포트를 열어야 할 수 있다)
+같은 사무실의 다른 PC 에서 보려면 `http://<이 PC 의 IP>:3300` 으로 접속한다.
+(윈도우 방화벽에서 3300 포트를 열어야 할 수 있다)
+
+> **주소가 바뀌면 포털에도 알려야 한다.** 통합 로그인은 돌아올 주소를
+> 글자 단위로 대조한다. IP 나 포트가 바뀌면 `.env.local` 의 `SSO_ISSUER`·
+> `SSO_REDIRECT_URI` 를 고치고, 포털에도 새 주소를 등록해야 한다.
+> 아래 "로그인" 절 참고.
 
 ### 3. 끄기
 
@@ -62,11 +75,33 @@ npm run dev
 
 ## 로그인
 
-지금은 **임시 로그인**이다. 통합 로그인 포털(dss-auth)의 OIDC 기능이 완성되면
-`src/lib/auth/dev-login.ts` 와 로그인 화면의 임시 UI 를 지우고 `oidc.ts` 로 갈아끼운다.
+**DSS 통합 로그인(dss-auth) 에 연결되어 있다.** 이 사이트는 아이디도 비밀번호도
+받지 않는다. 로그인 버튼을 누르면 포털로 갔다가 돌아온다.
 
-- 임시 로그인은 `.env.local` 의 `DEV_FAKE_LOGIN_ENABLED=true` 일 때만 뜬다. 기본값은 꺼짐.
-- 이남준 님 계정은 **관리자**로 등록되어 있다. 새 이름으로 들어오면 **열람자**가 된다.
+- 포털에서 승인된 직원이면 **누구나 열람**할 수 있다. 처음 들어온 사람은
+  **열람자**로 자동 등록된다.
+- 등록·수정·삭제를 하려면 **포털에서 ADMIN 역할**을 받아야 한다.
+  포털 쪽에서 `npm run client:grant -- --client dss-meters --user <이름> --role ADMIN --by <관리자>`
+- 포털에서 로그아웃하면 이 사이트의 세션도 **즉시** 끊긴다 (백채널 로그아웃).
+- 통합 로그인을 붙이기 전 임시 로그인으로 만들어 둔 계정은 `npm run sso:link` 로
+  포털 계정에 이어 준다. 잇지 않으면 같은 사람이 열람자로 새로 하나 더 생긴다.
+
+연결에 필요한 값은 `.env.local` 의 `SSO_` 로 시작하는 넷이다 (`.env.example` 참고).
+`SSO_CLIENT_SECRET` 은 포털에서 발급할 때 **한 번만** 보여준다.
+
+### 주소가 바뀌었을 때 (Wi-Fi · 다른 PC · NAS 이전)
+
+고칠 곳이 네 군데다. 하나라도 빠지면 로그인이 막힌다.
+
+| # | 어디 | 무엇 |
+|---|---|---|
+| 1 | 이 사이트 `.env.local` | `SSO_ISSUER=http://<포털 IP>:3100` |
+| 2 | 이 사이트 `.env.local` | `SSO_REDIRECT_URI=http://<이 PC IP>:3300/api/auth/sso/callback` |
+| 3 | 포털 | `npm run client:register -- --client-id dss-meters --redirect-uri <위와 같은 주소>` |
+| 4 | 포털 | 같은 명령의 `--backchannel-logout-uri http://<이 PC IP>:3300/api/auth/sso/backchannel-logout` |
+
+3번은 **주던 목록을 통째로 갈아끼운다.** 여러 곳에서 쓸 거면 `--redirect-uri` 를
+여러 번 준다.
 
 ---
 
@@ -74,8 +109,11 @@ npm run dev
 
 | 명령 | 하는 일 |
 |---|---|
-| `npm run dev` | 개발 서버 (3200 포트) |
+| `npm run dev` | 개발 서버 (3300 포트) |
 | `npm run build` | 배포용 빌드 |
+| `npm run typecheck` | 타입 검사만 (빌드보다 빠름) |
+| `npm run db:up` / `db:down` | 도커 개발 DB 켜기 / 끄기 |
+| `npm run sso:link` | 기존 이용자를 포털 계정에 잇기 (인자 없이 실행하면 목록) |
 | `npm run db:generate` | 스키마를 고친 뒤 마이그레이션 SQL 생성 |
 | `npm run db:migrate` | 마이그레이션을 DB 에 적용 |
 | `npm run db:studio` | 브라우저로 DB 내용 보기 |
@@ -85,7 +123,9 @@ npm run dev
 | `npm run import-certs` | NAS 의 교정 성적서 이관 (`-- --apply` 로 실제 반영) |
 | `npm run backfill-calibrations` | 성적서만 붙어 있는 것을 교정 이력에 연결 (`-- --apply`) |
 
-빌드가 SWC/Turbopack 에서 막히면 `next dev --webpack` / `next build --webpack` 을 쓴다.
+`dev` 와 `build` 에는 이미 `--webpack` 이 붙어 있다. 일부 PC 의 보안 정책이 Next 의
+네이티브 SWC 바이너리를 막아 Turbopack 이 뜨지 않기 때문이다 (오류 문구는 플랫폼
+문제처럼 보이지만 원인은 그쪽이다).
 
 ---
 
@@ -98,7 +138,7 @@ npm run dev
 - 계측기 등록 / 수정 / 삭제 (관리자만, 삭제는 소프트 삭제)
 - 한국어 ↔ 일본어 화면 전환 (계측기명·상태 번역)
 - 엑셀 이관 — 계측기 79대, 사진 113건
-- 임시 로그인, 관리자/열람자 권한 분리, 감사 로그
+- 관리자/열람자 권한 분리, 감사 로그
 
 **2차**
 
@@ -111,10 +151,11 @@ npm run dev
 
 - 교정 기한 메일 알림 — 매달 1일, 다음 달 기한 대상 (docs/NOTIFY.md)
 - 받는 사람 관리, 메일 문구 편집, 발송 기록 화면
+- **dss-auth 통합 로그인 실제 연결** — 임시 로그인 폐기, 백채널 로그아웃까지
 
 ## 아직 안 만든 것
 
-- **dss-auth 통합 로그인 실제 연결** — 포털이 열려야 가능하다
+- **NAS 이전** — 지금은 PC 에서 돈다. 옮길 때 포털에 등록된 주소도 함께 바꿔야 한다.
 
 ---
 

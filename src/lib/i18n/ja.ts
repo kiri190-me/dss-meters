@@ -28,16 +28,15 @@ export const ja: Dictionary = {
   },
   login: {
     title: "計測器管理",
-    portalPending:
-      "統合ログインポータルとの接続を準備中です。準備が整い次第、この画面からログインできます。",
-    tempTitle: "仮ログイン",
-    tempNotice:
-      "開発用の仮ログインです。統合ログインポータルに接続すると、この画面はなくなります。",
-    pickUser: "登録済みユーザーでログイン",
-    newViewer: "新しい閲覧者としてログイン",
-    namePlaceholder: "氏名",
-    submit: "ログイン",
-    failed: "ログインできませんでした。",
+    intro: "DSS統合ログインでログインします。",
+    button: "DSS統合ログイン",
+    hint: "ポータルで確認したあと、この画面に戻ります。",
+    errorGeneric: "ログインできませんでした。しばらくしてからもう一度お試しください。",
+    errorExpired: "ログインの有効時間が過ぎました。もう一度お試しください。",
+    errorUnknownRole:
+      "このシステムが知らない役割が指定されています。ポータル管理者にお知らせください。",
+    errorInactive: "利用停止中のアカウントです。管理者にお問い合わせください。",
+    errorDeleted: "削除されたアカウントです。管理者にお問い合わせください。",
   },
   list: {
     total: "全体",

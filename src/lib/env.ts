@@ -46,19 +46,11 @@ export const env = {
   },
 
   /**
-   * 임시 로그인 사용 여부. 기본값은 반드시 꺼짐.
-   * dss-auth 의 OIDC 엔드포인트가 열리면 이 값과 관련 코드를 통째로 폐기한다.
-   */
-  get devFakeLoginEnabled(): boolean {
-    return flag("DEV_FAKE_LOGIN_ENABLED");
-  },
-
-  /**
    * 알림 메일에 넣을 사이트 주소.
    * 지금은 개발 주소다. NAS 에 올리거나 도메인이 생기면 이 값만 바꾼다.
    */
   get siteUrl(): string {
-    const raw = process.env.SITE_URL ?? "http://localhost:3200";
+    const raw = process.env.SITE_URL ?? "http://localhost:3300";
     return raw.endsWith("/") ? raw.slice(0, -1) : raw;
   },
 
@@ -93,5 +85,59 @@ export const env = {
     const n = raw ? Number(raw) : 12;
     if (!Number.isFinite(n) || n <= 0 || n > 12) return 12;
     return n;
+  },
+
+  /* ---------------------------------------------------------------- */
+  /* DSS 통합 로그인 (dss-auth 포털)                                    */
+  /*                                                                   */
+  /* 이름을 SSO_ 로 맞춘 이유: A/S 관리 시스템도 같은 이름을 쓴다.       */
+  /* Wi-Fi 가 바뀌어 IP 가 달라지면 두 시스템을 같은 방식으로 고친다.    */
+  /* ---------------------------------------------------------------- */
+
+  /**
+   * 포털 주소. ID 토큰의 iss 클레임과 문자 단위로 같아야 한다.
+   *
+   * 끝의 슬래시를 떼는 이유: "http://x/" 와 "http://x" 가 섞이면 iss 대조가
+   * 실패하는데, 원인을 찾기가 가장 어려운 종류의 버그다.
+   */
+  get ssoIssuer(): string {
+    return required("SSO_ISSUER").replace(/\/+$/, "");
+  },
+
+  /** 포털에 등록된 이 시스템의 식별자. ID 토큰의 aud 이기도 하다. */
+  get ssoClientId(): string {
+    return required("SSO_CLIENT_ID");
+  },
+
+  /** 토큰 교환에만 쓴다. 브라우저에 절대 내보내지 않는다. */
+  get ssoClientSecret(): string {
+    return required("SSO_CLIENT_SECRET");
+  },
+
+  /**
+   * 포털에 등록한 값과 문자 단위로 같아야 한다.
+   *
+   * 요청(request.url)에서 만들어 쓰지 않고 환경변수로 두는 이유: LAN 으로
+   * 들어온 요청인데도 서버 자신의 바인딩 주소(localhost)가 보이는 경우가
+   * A/S 시스템에서 실측되었다. redirect_uri 는 /authorize 와 /token 양쪽에서
+   * 문자 단위로 대조되므로, 만들어 쓰면 "어떤 망에서는 되고 어떤 망에서는
+   * 안 되는" 형태로 실패한다.
+   */
+  get ssoRedirectUri(): string {
+    return required("SSO_REDIRECT_URI");
+  },
+
+  /**
+   * 로그인 왕복 동안 state·nonce·PKCE 검증값을 나르는 쿠키의 서명 키.
+   *
+   * 이 서명이 곧 PKCE 다 — 서명이 없으면 브라우저가 code_verifier 를 제 손으로
+   * 바꿔 끼울 수 있어 PKCE 가 무의미해진다.
+   */
+  get ssoTxSecret(): string {
+    const secret = required("SSO_TX_SECRET");
+    if (secret.length < 32) {
+      throw new Error("SSO_TX_SECRET 은 32자 이상이어야 합니다.");
+    }
+    return secret;
   },
 };

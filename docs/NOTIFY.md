@@ -9,7 +9,7 @@
 
 ## 화면에서 하는 일
 
-**관리자 머리말의 「알림 설정」** → http://localhost:3200/settings/notify
+**관리자 머리말의 「알림 설정」** → http://localhost:3300/settings/notify
 
 | | 내용 |
 |---|---|

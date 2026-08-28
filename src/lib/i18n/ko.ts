@@ -26,16 +26,15 @@ export const ko = {
   },
   login: {
     title: "계측기 관리",
-    portalPending:
-      "통합 로그인 포털 연결을 준비 중입니다. 준비가 끝나면 이 화면에서 바로 로그인할 수 있습니다.",
-    tempTitle: "임시 로그인",
-    tempNotice:
-      "개발용 임시 로그인입니다. 통합 로그인 포털이 연결되면 이 화면은 사라집니다.",
-    pickUser: "등록된 사용자로 로그인",
-    newViewer: "새 열람자로 로그인",
-    namePlaceholder: "이름",
-    submit: "로그인",
-    failed: "로그인하지 못했습니다.",
+    intro: "DSS 통합 로그인으로 들어갑니다.",
+    button: "DSS 통합 로그인",
+    hint: "포털에서 확인한 뒤 이 화면으로 돌아옵니다.",
+    errorGeneric: "로그인하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+    errorExpired: "로그인 시간이 지났습니다. 다시 시도해 주세요.",
+    errorUnknownRole:
+      "이 시스템이 모르는 역할이 지정되어 있습니다. 포털 관리자에게 알려 주세요.",
+    errorInactive: "사용이 정지된 계정입니다. 관리자에게 문의하세요.",
+    errorDeleted: "삭제된 계정입니다. 관리자에게 문의하세요.",
   },
   list: {
     total: "전체",

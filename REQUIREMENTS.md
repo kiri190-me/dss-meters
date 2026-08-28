@@ -35,9 +35,8 @@
 ### 로그인 방식
 
 - 자체 로그인은 만들지 않는다. **DSS 통합 로그인 포털(dss-auth)** 에 위임한다.
-- 포털의 OIDC 연결 기능이 **아직 미완성**(약 1주일 예상)이므로,
-  그전까지는 **임시 로그인**으로 개발하고 포털이 준비되면 교체한다.
-- 임시 로그인 코드는 `src/lib/auth/` 안에 격리하고, 기본값은 **비활성**으로 둔다.
+- 포털 연결이 끝났다(2026-08-28). 임시 로그인은 폐기했다.
+- 포털과 이야기하는 코드는 `src/lib/auth/oidc.ts` 한 곳에 가둔다.
 
 ---
 
@@ -47,7 +46,7 @@
 
 | 화면 | 하는 일 |
 |---|---|
-| **로그인** | 포털로 넘겨 인증받고 돌아온다. (개발 중에는 임시 로그인) |
+| **로그인** | 버튼 하나로 포털에 넘겨 인증받고 돌아온다. |
 | **계측기 목록** | 전체 계측기를 표로 보여준다. 검색·필터·정렬. 기본 화면. |
 | **계측기 상세** | 한 대의 모든 정보 + 사진(본체·부속품)을 본다. |
 | **계측기 등록** | 새 계측기를 추가한다. **관리자만.** |
@@ -166,7 +165,6 @@
 - [x] 계측기 등록 / 수정 / 삭제 — 관리자만
 - [x] 엑셀 79대 + 사진 68장 데이터 이관
 - [x] 한국어 / 일본어 화면 전환
-- [x] 임시 로그인 (포털 연결 전까지)
 - [x] 관리자 / 열람자 권한 분리
 
 ### 2차 — 그다음
@@ -184,7 +182,7 @@
   - 수신자: `njlee@dss21.com` + 추후 등록할 2명
   - 발송 서버: **cafe24 메일**
 - [ ] 알림 수신자 관리 화면
-- [ ] dss-auth 통합 로그인 실제 연결
+- [x] dss-auth 통합 로그인 실제 연결
 
 ---
 
@@ -212,7 +210,7 @@
 | DB | PostgreSQL — 전용 DB `dss_meters` |
 | ORM | Drizzle ORM 0.45 |
 | 스타일 | Tailwind CSS 4 |
-| 접속 포트 | **3200** (A/S 3000 · 포털 3100과 중복 회피) |
+| 접속 포트 | **3300** (A/S 3000 · 포털 3100 · dss-home 3200 과 중복 회피) |
 | 시스템 식별자 | `dss-meters` |
 | 최종 운영 환경 | Synology DS218+ NAS / Linux Docker |
 | 메일 발송 | cafe24 SMTP (3차) |
@@ -240,24 +238,30 @@
 
 ---
 
-## 10. 포털(dss-auth) 관리자에게 제출할 등록 정보
+## 10. 포털(dss-auth) 등록 정보 — **등록 완료 (2026-08-28)**
 
-포털 관리자가 `clients` 표에 아래 내용을 등록해 주어야 실제 로그인 연결이 가능하다.
-**포털의 OIDC 기능 완성 예정: 약 1주일 후 (2026-09-03 전후)**
+아래 내용으로 포털에 등록되어 있고, 실제 로그인 왕복이 확인되었다.
 
 | 항목 | 값 |
 |---|---|
 | `client_id` | `dss-meters` |
-| `name` | 계측기 관리 시스템 |
-| `description` | 사내 계측기 목록 및 교정 기한 관리 |
-| `redirect_uris` | `http://localhost:3200/api/auth/callback`<br>`http://<개발PC IP>:3200/api/auth/callback`<br>`http://<NAS IP>:3200/api/auth/callback` |
-| `post_logout_redirect_uris` | `http://localhost:3200/`<br>`http://<NAS IP>:3200/` |
-| `launcher_url` | `http://<NAS IP>:3200/` |
+| `name` | DSS 계측기 관리 시스템 |
+| `description` | 사내 계측기 목록·사진·교정 이력·성적서 관리 |
+| `redirect_uris` | `http://192.168.1.132:3300/api/auth/sso/callback`<br>`http://localhost:3300/api/auth/sso/callback` |
+| `post_logout_redirect_uris` | `http://192.168.1.132:3300/login`<br>`http://localhost:3300/login` |
+| `backchannel_logout_uri` | `http://192.168.1.132:3300/api/auth/sso/backchannel-logout` |
+| `launcher_url` | `http://192.168.1.132:3300/` |
+| `available_roles` | `ADMIN` · `VIEWER` |
 | `requires_grant` | **false** — 승인된 사원이면 누구나 열람 가능 |
-| 포트 | **3200** |
+| 포트 | **3300** (A/S 3000 · 포털 3100 · dss-home 3200 과 겹치지 않게) |
 
 > `client_secret`은 발급 시 **한 번만** 표시되며 복구가 불가능하다.
-> 받으면 `.env.local`에만 저장하고 절대 git에 올리거나 메신저로 평문 전송하지 않는다.
+> `.env.local`에만 저장하고 절대 git에 올리거나 메신저로 평문 전송하지 않는다.
+> 잃어버렸으면 포털에서 `npm run client:register -- --client-id dss-meters --rotate`.
+
+**아직 등록되지 않은 주소가 있다.** 위 목록은 개발 PC(192.168.1.132)와 localhost
+뿐이다. 이남준 님 PC 나 NAS 에서 띄우려면 그 주소를 `--redirect-uri` 로 함께
+등록해야 한다 — 등록되지 않은 주소로는 포털이 아예 돌려보내지 않는다.
 
 ---
 

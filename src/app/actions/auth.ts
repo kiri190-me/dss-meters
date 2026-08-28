@@ -4,18 +4,8 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 
-import { safeReturnTo } from "@/lib/auth/guards";
-import {
-  devLoginEnabled,
-  findDevUser,
-  touchLogin,
-  upsertDevViewer,
-} from "@/lib/auth/dev-login";
-import {
-  createSession,
-  destroySession,
-  getSessionUser,
-} from "@/lib/auth/session";
+import { endSessionUrl } from "@/lib/auth/oidc";
+import { destroySession, getSessionUser } from "@/lib/auth/session";
 import { writeAudit } from "@/lib/audit";
 import { LANG_COOKIE, LANGUAGES, type Lang } from "@/lib/i18n";
 
@@ -37,49 +27,17 @@ export async function setLanguageAction(formData: FormData): Promise<void> {
   revalidatePath("/", "layout");
 }
 
-/* ------------------------------------------------------------------ */
-/* 아래 두 개는 dss-auth OIDC 연결 시 폐기 대상                          */
-/* ------------------------------------------------------------------ */
-
-export async function devLoginAsAction(formData: FormData): Promise<void> {
-  if (!devLoginEnabled()) redirect("/login");
-
-  const userId = String(formData.get("userId") ?? "");
-  const returnTo = safeReturnTo(String(formData.get("returnTo") ?? "/"));
-
-  const user = await findDevUser(userId);
-  if (!user || !user.isActive) redirect("/login?error=1");
-
-  await touchLogin(user.id);
-  await createSession(user.id);
-  await writeAudit({
-    actor: user,
-    action: "LOGIN",
-    summary: `${user.displayName} 로그인 (임시 로그인)`,
-  });
-
-  redirect(returnTo);
-}
-
-export async function devLoginNewAction(formData: FormData): Promise<void> {
-  if (!devLoginEnabled()) redirect("/login");
-
-  const name = String(formData.get("name") ?? "").trim();
-  const returnTo = safeReturnTo(String(formData.get("returnTo") ?? "/"));
-
-  if (!name) redirect("/login?error=1");
-
-  const user = await upsertDevViewer(name);
-  await createSession(user.id);
-  await writeAudit({
-    actor: user,
-    action: "LOGIN",
-    summary: `${user.displayName} 로그인 (임시 로그인 · 신규 열람자)`,
-  });
-
-  redirect(returnTo);
-}
-
+/**
+ * 로그아웃.
+ *
+ * 이 사이트의 세션을 끊은 뒤 **포털의 로그아웃까지** 다녀온다. 여기 쿠키만
+ * 지우면 포털 세션은 그대로라, 로그인 버튼을 한 번 누르는 것만으로 누구인지
+ * 다시 묻지도 않고 그대로 들어온다. 자세한 근거는 lib/auth/oidc.ts 의
+ * endSessionUrl 주석에 있다.
+ *
+ * 포털도 백채널 로그아웃으로 이 사이트에 통보하지만, 그 통보를 기다리지
+ * 않는다 — 누른 사람의 세션은 지금 끊겨 있어야 한다.
+ */
 export async function logoutAction(): Promise<void> {
   const user = await getSessionUser();
   if (user) {
@@ -90,5 +48,5 @@ export async function logoutAction(): Promise<void> {
     });
   }
   await destroySession();
-  redirect("/login");
+  redirect(endSessionUrl());
 }
