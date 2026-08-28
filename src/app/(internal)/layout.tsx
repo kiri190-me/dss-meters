@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 
 import { AppHeader } from "@/components/AppHeader";
 import { requireSession } from "@/lib/auth/guards";
+import { portalAppsUrl } from "@/lib/auth/oidc";
 import { getDictionary } from "@/lib/i18n";
 
 /**
@@ -19,7 +20,7 @@ export default async function InternalLayout({
 
   return (
     <div className="flex min-h-full flex-col">
-      <AppHeader user={user} lang={lang} t={t} />
+      <AppHeader user={user} lang={lang} t={t} portalUrl={portalAppsUrl()} />
       <main className="mx-auto w-full max-w-[1400px] flex-1 px-4 py-6">
         {children}
       </main>

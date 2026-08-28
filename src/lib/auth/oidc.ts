@@ -330,3 +330,13 @@ export async function verifyLogoutToken(token: string): Promise<string | null> {
 export function endSessionUrl(): string {
   return `${env.ssoIssuer}/api/oidc/logout`;
 }
+
+/**
+ * 포털의 앱 런처 — 이 사람이 쓸 수 있는 다른 사내 시스템으로 가는 곳.
+ *
+ * 프로토콜 주소가 아니라 사람이 보는 화면이다. 로그아웃과 다르다: 여기로
+ * 가도 이 사이트의 세션은 그대로 살아 있어서, 돌아오면 다시 로그인하지 않는다.
+ */
+export function portalAppsUrl(): string {
+  return `${env.ssoIssuer}/apps`;
+}

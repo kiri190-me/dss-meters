@@ -9,10 +9,13 @@ export function AppHeader({
   user,
   lang,
   t,
+  portalUrl,
 }: {
   user: WebUser;
   lang: Lang;
   t: Dictionary;
+  /** 포털의 앱 런처. 다른 사내 시스템으로 건너가는 문이다. */
+  portalUrl: string;
 }) {
   return (
     <header className="no-print border-b border-slate-200 bg-white">
@@ -46,10 +49,22 @@ export function AppHeader({
             </span>
           </span>
 
+          {/*
+            포털로 돌아가는 문. 로그아웃과 나란히 두되 생김새를 다르게 한다 —
+            둘 다 이 사이트를 떠나지만, 이쪽은 세션을 그대로 두고 다녀오는 것이고
+            저쪽은 모든 시스템에서 나가는 것이다. 같아 보이면 잘못 누른다.
+          */}
+          <a
+            href={portalUrl}
+            className="rounded-md border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
+          >
+            {t.nav.portal}
+          </a>
+
           <form action={logoutAction}>
             <button
               type="submit"
-              className="rounded-md border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
+              className="rounded-md bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-500 hover:bg-slate-200"
             >
               {t.nav.logout}
             </button>

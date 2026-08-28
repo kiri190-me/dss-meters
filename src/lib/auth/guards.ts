@@ -25,13 +25,26 @@ export function safeReturnTo(value: string | null | undefined): string {
   return value;
 }
 
-/** 로그인 필수. 없으면 로그인 화면으로 보낸다. */
+/**
+ * 로그인 필수. 없으면 포털로 곧장 보낸다.
+ *
+ * `/login` 화면을 거치지 않는 이유: 이 사이트에는 자체 로그인이 없어서 그
+ * 화면에 있는 것이라고는 "포털로 가세요" 버튼 하나뿐이다. 포털 앱 런처에서
+ * 타일을 눌러 들어온 사람은 방금 포털에서 왔는데 포털로 가라는 화면을 다시
+ * 보게 되고, 그 버튼을 눌러도 이미 로그인된 포털을 그대로 통과해 돌아온다.
+ * 아무것도 묻지 않는 화면이라면 보여줄 이유가 없다.
+ *
+ * `/login` 은 남는다 — 로그인이 **거절됐을 때** 이유를 보여줄 자리가 필요하고,
+ * 거기서는 자동으로 다시 보내지 않는다(그러면 무한 왕복이 된다).
+ */
 export async function requireSession(returnTo?: string): Promise<WebUser> {
   const user = await getSessionUser();
   if (!user) {
     const target = safeReturnTo(returnTo);
     redirect(
-      target === "/" ? "/login" : `/login?returnTo=${encodeURIComponent(target)}`,
+      target === "/"
+        ? "/api/auth/sso/start"
+        : `/api/auth/sso/start?returnTo=${encodeURIComponent(target)}`,
     );
   }
   return user;
