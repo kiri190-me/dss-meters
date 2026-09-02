@@ -19,7 +19,7 @@ export const ko = {
   },
   nav: {
     logout: "로그아웃",
-    portal: "사내 시스템",
+    portal: "통합 로그인으로",
     language: "언어",
     admin: "관리자",
     notifySettings: "알림 설정",
