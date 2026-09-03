@@ -8,6 +8,19 @@
  * 검사하기 위해서다. (빌드 중에 불필요하게 터지지 않게)
  */
 
+import {
+  isAutoValue,
+  primaryLanAddress,
+  resolveAutoUrl,
+} from "./lan-address";
+
+/** 포털(dss-auth)의 포트. */
+const PORTAL_PORT = 3100;
+/** 이 시스템의 포트. .env.local의 PORT와 같아야 한다. */
+const OWN_PORT = Number(process.env.PORT ?? 3300);
+/** 포털에 등록된 이 시스템 redirect_uri의 경로 부분. */
+const SSO_CALLBACK_PATH = "/api/auth/sso/callback";
+
 function required(name: string): string {
   const value = process.env[name];
   if (!value || value.trim() === "") {
@@ -50,7 +63,12 @@ export const env = {
    * 지금은 개발 주소다. NAS 에 올리거나 도메인이 생기면 이 값만 바꾼다.
    */
   get siteUrl(): string {
-    const raw = process.env.SITE_URL ?? "http://localhost:3300";
+    const configured = process.env.SITE_URL ?? "http://localhost:3300";
+    // auto 면 메일 속 링크가 지금 이 기계의 주소를 가리킨다. localhost 로
+    // 적힌 링크는 메일을 받은 사람의 PC 에서 열리지 않는다.
+    const raw = isAutoValue(configured)
+      ? resolveAutoUrl(configured, OWN_PORT, primaryLanAddress())
+      : configured;
     return raw.endsWith("/") ? raw.slice(0, -1) : raw;
   },
 
@@ -101,7 +119,12 @@ export const env = {
    * 실패하는데, 원인을 찾기가 가장 어려운 종류의 버그다.
    */
   get ssoIssuer(): string {
-    return required("SSO_ISSUER").replace(/\/+$/, "");
+    // auto 면 이 기계의 사내망 주소로 푼다 — 개발 중에는 포털도 같은 PC 에 있다.
+    const raw = required("SSO_ISSUER");
+    const resolved = isAutoValue(raw)
+      ? resolveAutoUrl(raw, PORTAL_PORT, primaryLanAddress())
+      : raw;
+    return resolved.replace(/\/+$/, "");
   },
 
   /** 포털에 등록된 이 시스템의 식별자. ID 토큰의 aud 이기도 하다. */
@@ -124,7 +147,12 @@ export const env = {
    * 안 되는" 형태로 실패한다.
    */
   get ssoRedirectUri(): string {
-    return required("SSO_REDIRECT_URI");
+    // auto 는 요청에서 만들어 쓰는 것과 다르다 — 이 기계의 네트워크 인터페이스를
+    // 읽으므로 누가 부르든 같은 문자열이 나온다. 위 주석이 배제한 "망에 따라
+    // 달라지는" 문제가 생기지 않는다.
+    const raw = required("SSO_REDIRECT_URI");
+    if (!isAutoValue(raw)) return raw;
+    return `${resolveAutoUrl(raw, OWN_PORT, primaryLanAddress())}${SSO_CALLBACK_PATH}`;
   },
 
   /**

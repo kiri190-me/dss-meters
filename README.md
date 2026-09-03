@@ -58,10 +58,9 @@ npm run dev
 같은 사무실의 다른 PC 에서 보려면 `http://<이 PC 의 IP>:3300` 으로 접속한다.
 (윈도우 방화벽에서 3300 포트를 열어야 할 수 있다)
 
-> **주소가 바뀌면 포털에도 알려야 한다.** 통합 로그인은 돌아올 주소를
-> 글자 단위로 대조한다. IP 나 포트가 바뀌면 `.env.local` 의 `SSO_ISSUER`·
-> `SSO_REDIRECT_URI` 를 고치고, 포털에도 새 주소를 등록해야 한다.
-> 아래 "로그인" 절 참고.
+> **주소가 바뀌어도 이제 손댈 곳이 없다.** `SSO_ISSUER`·`SSO_REDIRECT_URI` 는
+> `auto` 로 두었고 포털 등록값은 `{lan}` 자리표시자를 쓴다. 둘 다 실행할 때
+> 이 기계의 실제 사내망 주소를 찾아 쓴다. 아래 "로그인" 절 참고.
 
 ### 3. 끄기
 
@@ -95,19 +94,24 @@ npm run dev
 
 ### 주소가 바뀌었을 때 (Wi-Fi · 다른 PC · NAS 이전)
 
-고칠 곳이 네 군데다. 하나라도 빠지면 로그인이 막힌다.
+**고칠 곳이 없다.** 예전에는 네 군데였다.
 
-| # | 어디 | 무엇 |
-|---|---|---|
-| 1 | 이 사이트 `.env.local` | `SSO_ISSUER=http://<포털 IP>:3100` |
-| 2 | 이 사이트 `.env.local` | `SSO_REDIRECT_URI=http://<이 PC IP>:3300/api/auth/sso/callback` |
-| 3 | 포털 | `npm run client:register -- --client-id dss-meters --redirect-uri <위와 같은 주소>` |
-| 4 | 포털 | 같은 명령의 `--backchannel-logout-uri http://<이 PC IP>:3300/api/auth/sso/backchannel-logout` |
+- `.env.local` 의 `SSO_ISSUER` · `SSO_REDIRECT_URI` → `auto`
+- 포털에 등록된 redirect_uri · backchannel_logout_uri → `http://{lan}:3300/...`
 
-3번은 **주던 목록을 통째로 갈아끼운다.** 여러 곳에서 쓸 거면 `--redirect-uri` 를
-여러 번 준다.
+둘 다 실행 시점에 이 기계의 실제 사내망 IPv4 를 찾아 쓰므로, Wi-Fi 를 옮기거나
+다른 PC 로 가도 저절로 맞는다. 지금 무엇으로 풀리는지 보려면 포털에서:
 
----
+```
+npm run net:doctor
+```
+
+자세한 내용은 `../dss-auth/docs/주소.md`.
+
+> **예외는 카카오 로그인 하나다.** 카카오 개발자 콘솔의 등록값은 우리가 바꿀
+> 수 없어서, 주소가 바뀌면 카카오만 따로 깨진다(다른 수단은 멀쩡해서 더
+> 헷갈린다). 공유기 DHCP 예약으로 주소를 고정해 두는 것이 근본 해결이다 —
+> 위 문서의 "주소 고정" 절.
 
 ## 자주 쓰는 명령
 

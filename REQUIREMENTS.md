@@ -247,10 +247,10 @@
 | `client_id` | `dss-meters` |
 | `name` | DSS 계측기 관리 시스템 |
 | `description` | 사내 계측기 목록·사진·교정 이력·성적서 관리 |
-| `redirect_uris` | `http://192.168.1.132:3300/api/auth/sso/callback`<br>`http://localhost:3300/api/auth/sso/callback` |
-| `post_logout_redirect_uris` | `http://192.168.1.132:3300/login`<br>`http://localhost:3300/login` |
-| `backchannel_logout_uri` | `http://192.168.1.132:3300/api/auth/sso/backchannel-logout` |
-| `launcher_url` | `http://192.168.1.132:3300/` |
+| `redirect_uris` | `http://{lan}:3300/api/auth/sso/callback`<br>`http://localhost:3300/api/auth/sso/callback` |
+| `post_logout_redirect_uris` | `http://{lan}:3300/login`<br>`http://localhost:3300/login` |
+| `backchannel_logout_uri` | `http://{lan}:3300/api/auth/sso/backchannel-logout` |
+| `launcher_url` | `http://{lan}:3300/` |
 | `available_roles` | `ADMIN` · `VIEWER` |
 | `requires_grant` | **false** — 승인된 사원이면 누구나 열람 가능 |
 | 포트 | **3300** (A/S 3000 · 포털 3100 · dss-home 3200 과 겹치지 않게) |
@@ -259,9 +259,16 @@
 > `.env.local`에만 저장하고 절대 git에 올리거나 메신저로 평문 전송하지 않는다.
 > 잃어버렸으면 포털에서 `npm run client:register -- --client-id dss-meters --rotate`.
 
-**아직 등록되지 않은 주소가 있다.** 위 목록은 개발 PC(192.168.1.132)와 localhost
-뿐이다. 이남준 님 PC 나 NAS 에서 띄우려면 그 주소를 `--redirect-uri` 로 함께
-등록해야 한다 — 등록되지 않은 주소로는 포털이 아예 돌려보내지 않는다.
+`{lan}` 은 자리표시자다. 포털이 검증하기 직전에 **자기 기계의 실제 사내망
+주소**로 펼친 뒤 평소와 똑같이 정확 일치로 대조한다(와일드카드가 아니다 —
+펼친 값은 언제나 포털 자신의 주소라, 요청하는 쪽이 그 목록을 바꿀 수 없다).
+
+덕분에 Wi-Fi 를 옮기거나 다른 PC 로 가도 다시 등록할 필요가 없다. 다만
+**포털과 이 시스템이 같은 기계에 있을 때** 성립한다. 이남준 님 PC 나 NAS 처럼
+포털과 다른 기계에서 띄운다면 그 주소를 `--redirect-uri` 로 따로 등록해야
+한다 — 등록되지 않은 주소로는 포털이 아예 돌려보내지 않는다.
+
+지금 무엇으로 펼쳐지는지는 포털에서 `npm run net:doctor`.
 
 ---
 
