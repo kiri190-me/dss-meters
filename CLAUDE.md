@@ -48,7 +48,8 @@ PC를 껐다 켰으면 둘 다 꺼져 있다.
 npm run dev
 ```
 
-(도커로 DB 를 쓰는 PC 에서는 첫 줄 대신 `npm run db:up`)
+(도커로 DB 를 쓰는 PC 에서는 첫 줄 대신 `docker start dss-pg-app` — 2026-09-03 부터
+A/S 와 나눠 쓰는 공용 인스턴스다. `npm run db:up` 은 앱이 더 보지 않는 옛 상자를 켠다)
 
 http://localhost:3300 → 로그인 화면 없이 포털로 넘어갔다가 목록으로 돌아온다.
 **포털(dss-auth, 3100)이 함께 떠 있어야 로그인이 된다.**

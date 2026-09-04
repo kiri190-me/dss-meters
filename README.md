@@ -40,11 +40,16 @@ PC를 껐다 켜면 PostgreSQL 이 꺼져 있다.
 "C:\Users\이남준\pgsql\bin\pg_ctl.exe" -D C:\pgdata status
 ```
 
-**도커를 쓰는 개발 PC** (`docker-compose.yml` 이 있는 곳):
+**도커를 쓰는 개발 PC** — 2026-09-03 부터 DB 가 이 저장소의 것이 아니다:
 
 ```
-npm run db:up      # 끄기는 npm run db:down
+docker start dss-pg-app     # A/S 와 나눠 쓰는 공용 인스턴스 (5442 · dss_meters)
 ```
+
+`Development\start-meters-work.ps1` 로 시작하면 이것까지 알아서 켠다.
+**`npm run db:up` 은 쓰지 않는다** — 그것은 옛 상자(`dss-meters-postgres-dev`, 5438)를
+켜는데 `.env.local` 은 5442 를 보므로, 켜져도 앱이 붙지 않는다. 되돌리기용으로만
+남아 있다(`dss-deploy/runbook/01-postgres-통합.md` 9절 부록 8번).
 
 ### 2. 웹사이트 켜기
 
@@ -120,7 +125,7 @@ npm run net:doctor
 | `npm run dev` | 개발 서버 (3300 포트) |
 | `npm run build` | 배포용 빌드 |
 | `npm run typecheck` | 타입 검사만 (빌드보다 빠름) |
-| `npm run db:up` / `db:down` | 도커 개발 DB 켜기 / 끄기 |
+| `npm run db:up` / `db:down` | **옛** 도커 개발 DB(5438). 지금 쓰는 것은 공용 `dss-pg-app` — 위 「DB 켜기」 |
 | `npm run sso:link` | 기존 이용자를 포털 계정에 잇기 (인자 없이 실행하면 목록) |
 | `npm run db:generate` | 스키마를 고친 뒤 마이그레이션 SQL 생성 |
 | `npm run db:migrate` | 마이그레이션을 DB 에 적용 |
