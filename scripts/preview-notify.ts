@@ -12,7 +12,9 @@ import path from "node:path";
 
 import postgres from "postgres";
 
-process.loadEnvFile(".env.local");
+import { loadLocalEnv } from "./load-env";
+
+loadLocalEnv();
 
 const OUT = "logs/notify-preview";
 

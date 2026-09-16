@@ -27,7 +27,9 @@ import {
   type PhotoKind,
 } from "../src/lib/db/schema";
 
-process.loadEnvFile(".env.local");
+import { loadLocalEnv } from "./load-env";
+
+loadLocalEnv();
 
 const DATABASE_URL = process.env.DATABASE_URL;
 const FILE_STORAGE_ROOT = process.env.FILE_STORAGE_ROOT;

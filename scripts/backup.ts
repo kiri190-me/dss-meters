@@ -28,7 +28,9 @@ import {
 import { EOL } from "node:os";
 import path from "node:path";
 
-process.loadEnvFile(".env.local");
+import { loadLocalEnv } from "./load-env";
+
+loadLocalEnv();
 
 const DATABASE_URL = required("DATABASE_URL");
 const FILE_STORAGE_ROOT = required("FILE_STORAGE_ROOT");

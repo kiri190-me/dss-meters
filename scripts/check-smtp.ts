@@ -14,7 +14,9 @@ import { constants } from "node:crypto";
 
 import nodemailer from "nodemailer";
 
-process.loadEnvFile(".env.local");
+import { loadLocalEnv } from "./load-env";
+
+loadLocalEnv();
 
 function required(name: string): string {
   const value = process.env[name];

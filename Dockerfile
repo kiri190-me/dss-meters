@@ -38,6 +38,54 @@ ENV DATABASE_URL="postgres://build:build@127.0.0.1:5432/build_time_only" \
 
 RUN npm run build
 
+# ── 곁가지 : 저장소의 스크립트를 돌리는 도구 이미지 ───────────────────
+#
+# 운영 이미지(3단계)에는 tsx 가 없다 — devDependency 라서다. 그래서 그 안에서는
+# `npm run send-notify` 같은 것을 부를 수 없다. 교정 기한 알림이 NAS 에서 돌려면
+# 그 자리를 맡을 이미지가 하나 필요하다.
+#
+#   docker build --target tools -t dss-meters-tools:1 .
+#
+# 평소에는 뜨지 않는다. NAS 에서는 compose 의 `profiles: [tools]` 서비스로 두고
+# 작업 스케줄러가 부를 때만 잠깐 떴다 사라진다.
+#
+# ⚠️ 이 스테이지를 runner 뒤로 옮기지 않는다. **마지막 스테이지가 `docker build`
+#    의 기본 대상**이라, 뒤에 두면 `--target` 없이 구운 이미지가 앱이 아니라
+#    도구가 된다 — 그리고 그 이미지는 `node server.js` 를 모른다.
+#
+# deps 를 이어받는 이유: `--target builder` 로 builder 를 재사용하면 .next 빌드
+# 산출물까지 딸려 온다. 도구는 그것을 쓰지 않는다.
+#
+# pg_dump 는 넣지 않았다 — 야간 백업은 DB 컨테이너에서 직접 뜬다
+# (dss-deploy/nas/jobs/backup-nightly.sh). 이 이미지로 `npm run backup` 을 돌릴
+# 일이 생기면 그때 3단계와 같은 방식으로 더한다.
+FROM ${NODE_IMAGE} AS tools
+WORKDIR /app
+ENV NODE_ENV=production TZ=Asia/Seoul
+
+# ⚠️ 소유자는 COPY 할 때 정한다. 다 옮겨 놓고 `RUN chown -R /app` 을 하면 그
+#    한 줄이 /app 전체를 새 레이어에 한 벌 더 복사한다 — 실측 1.86GB → 이 방식 후
+#    1.07GB. 3단계가 쓰는 방식과 같다.
+COPY --from=deps --chown=node:node /app/node_modules ./node_modules
+COPY --chown=node:node package.json tsconfig.json ./
+COPY --chown=node:node scripts ./scripts
+COPY --chown=node:node src ./src
+
+# 실행 기록이 남는 곳. 스크립트가 process.cwd() 기준으로 쓰므로 /app/logs 다.
+# 여기 남는 것은 `run --rm` 과 함께 사라진다 — 운영의 기록은 이 컨테이너를 부르는
+# NAS 쪽 jobs/notify-daily.sh 가 root 로 setup/logs/ 에 남긴다(야간 백업과 같은 방식).
+# 스크립트가 화면에 찍는 줄과 로그에 남기는 줄이 같아서 볼륨을 하나 더 붙이지 않는다.
+RUN mkdir -p /app/logs && chown node:node /app/logs
+
+USER node
+
+# ⚠️ .env.local 은 이미지에 없다(.dockerignore 가 .env* 를 막는다). 값은 컨테이너
+#    환경변수로 들어온다. 스크립트가 그 없음을 견디는 자리는 scripts/load-env.ts.
+#
+# 기본값은 아무것도 내보내지 않는 쪽으로 둔다. 실제 발송은 명령을 적어 부른다:
+#   docker compose ... run --rm tools-meters npm run send-notify
+CMD ["npm", "run", "send-notify", "--", "--dry"]
+
 # ── 3단계 : 실행에 필요한 것만 담는다 ─────────────────────────────────
 FROM ${NODE_IMAGE} AS runner
 WORKDIR /app

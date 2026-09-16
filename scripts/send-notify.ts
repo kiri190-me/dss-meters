@@ -19,7 +19,9 @@ import path from "node:path";
 
 import postgres from "postgres";
 
-process.loadEnvFile(".env.local");
+import { loadLocalEnv } from "./load-env";
+
+loadLocalEnv();
 
 /**
  * 화면에 찍은 것을 그대로 로그 파일에도 남긴다 (백업 스크립트와 같은 방식).

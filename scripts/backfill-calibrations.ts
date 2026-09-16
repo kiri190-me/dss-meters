@@ -24,7 +24,9 @@ import {
   webUsers,
 } from "../src/lib/db/schema";
 
-process.loadEnvFile(".env.local");
+import { loadLocalEnv } from "./load-env";
+
+loadLocalEnv();
 
 const DATABASE_URL = process.env.DATABASE_URL;
 if (!DATABASE_URL) throw new Error("환경변수 DATABASE_URL 이 없습니다.");
