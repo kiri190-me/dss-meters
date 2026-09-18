@@ -158,8 +158,32 @@ export default async function MeterListPage({
         </p>
       </div>
 
-      {/* 한 줄 요약 */}
-      <div className="no-print flex flex-wrap items-center gap-x-5 gap-y-1 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm">
+      {/*
+        한 줄 요약.
+
+        🔴 세로 폰(<640px)에서는 **2칸 격자**, 640px 부터는 예전 그대로 한 줄
+        `flex`(2026-09-18 사용자 폰 사진). 왜 둘로 나뉘는가:
+
+        예전에는 폭에 관계없이 `flex flex-wrap` 하나였는데, 폰에서는 넷이 한
+        줄에 안 들어가 제멋대로 접혔다. 접히는 자리가 통계 **사이**가 아니라
+        구분점 뒤라서 「전체 76대 · 기한초과 11 ·」처럼 **줄 끝에 점만 덩그러니**
+        남았고(아래 구분점 주석), 줄마다 글자 수가 달라 세로로도 안 맞았다.
+
+        격자로 두면 넷이 2×2 로 **칸이 맞고**, 접히는 자리를 flex 가 마음대로
+        고르지 않는다. 그리고 구분점이 필요 없어진다 — 칸이 이미 갈라 준다.
+
+        640px 부터는 `sm:flex sm:flex-wrap` 이 `display:grid` 를 덮으므로
+        `grid-cols-2` 는 아무 일도 하지 않는다. 넓은 화면은 한 픽셀도 달라지지
+        않는다.
+
+        🔴 기준점이 `md`(768)가 아니라 `sm`(640)인 이유: 이것은 **글자를
+        줄이는** 판단(머리말의 짧은 이름 · 검색 안내글 — 그쪽은 @dss/ui 의
+        768px 과 맞춰야 한다)이 아니라 **쌓는** 판단이다. 가로로 돌린 폰이
+        640〜768px 에 들어오는데(SE 667 · 8 Plus 736), 거기서는 넷이 한 줄에
+        넉넉히 들어간다 — `md` 로 두면 그 폭까지 세 줄로 쪼개 예전보다
+        나빠진다.
+      */}
+      <div className="no-print grid grid-cols-2 items-center gap-x-5 gap-y-1 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm sm:flex sm:flex-wrap">
         <span className="text-slate-700">
           {t.list.total}{" "}
           <strong className="tabular text-base text-slate-900">
@@ -167,15 +191,27 @@ export default async function MeterListPage({
           </strong>
           {t.common.unit}
         </span>
-        <span className="text-slate-300">·</span>
+        {/*
+          🔴 구분점은 **세로 폰에서 끈다**(`hidden sm:inline`).
+
+          이것은 독립된 칸이라 줄이 바뀔 때 앞 통계와 함께 가지 않고 **홀로
+          줄 끝에 남았다.** 뒤 통계에 붙여 두면 이번엔 다음 줄이 점으로 시작해
+          마찬가지로 어색하다. 폰에서는 위 격자가 이미 칸을 갈라 주므로 점이
+          할 일이 없다 — 지우는 것이 가장 깨끗하다.
+
+          `hidden`(display:none)이라 격자 칸도 차지하지 않는다. 뜻이 아니라
+          **장식**이라(앞뒤 글자가 이미 무엇인지 말한다) 낭독기에서 사라져도
+          잃는 것이 없다. 640px 부터는 `sm:inline` 으로 예전 그대로 돌아온다.
+        */}
+        <span className="hidden text-slate-300 sm:inline">·</span>
         <span className={summary.overdue > 0 ? "text-red-700" : "text-slate-400"}>
           {t.list.overdue} <strong className="tabular">{summary.overdue}</strong>
         </span>
-        <span className="text-slate-300">·</span>
+        <span className="hidden text-slate-300 sm:inline">·</span>
         <span className={summary.soon > 0 ? "text-amber-700" : "text-slate-400"}>
           {t.list.soon} <strong className="tabular">{summary.soon}</strong>
         </span>
-        <span className="text-slate-300">·</span>
+        <span className="hidden text-slate-300 sm:inline">·</span>
         <span
           className={summary.calibrating > 0 ? "text-sky-700" : "text-slate-400"}
         >
@@ -183,27 +219,64 @@ export default async function MeterListPage({
           <strong className="tabular">{summary.calibrating}</strong>
         </span>
 
-        {admin && unassigned > 0 && (
-          <Link
-            href="/certificates"
-            className="ml-auto rounded-md border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-800 hover:bg-amber-100"
-          >
-            {t.cert.unassigned} {unassigned}
-          </Link>
-        )}
+        {/*
+          단추 둘을 한 묶음으로 싼다.
 
+          🔴 폰: `col-span-2` 로 격자의 **두 칸을 다 써** 제 줄을 갖고, 안에서
+          `flex-1` 로 둘이 폭을 반씩 나눠 가진다. `py-3` 은 손가락 크기다
+          (16 + 12 + 12 = 40px — 예전 `py-1.5` 로는 28px 이라 폰에서 눌리지
+          않았다). 통계는 왼쪽, 단추는 오른쪽이던 **줄마다 다른 정렬**이
+          사라지고 단추 줄이 폭을 꽉 채운다.
+
+          🔴 640px 부터: `sm:ml-auto` 로 이 묶음이 오른쪽 끝으로 가고
+          `sm:gap-x-5` 가 예전 바깥 `gap-x-5`(20px)를 그대로 잇고
+          `sm:flex-none`·`sm:py-1.5` 로 단추가 제 내용 폭·예전 높이로 돌아온다.
+          예전에는 `ml-auto` 가 단추 자신에게 붙어 있었는데(미등록이 없으면
+          등록 단추로 옮겨 다녔다), 묶음이 그 일을 대신 맡아 그 조건 분기도
+          사라졌다. 그려지는 자리는 같다.
+
+          `text-center` 는 폰에서만 뜻이 있다 — 640px 부터는 `flex-none` 이라
+          글자 폭만큼만 차지해 가운데 맞출 자리가 없다.
+        */}
         {admin && (
-          <Link
-            href="/meters/new"
-            className={`rounded-md bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-700 ${unassigned > 0 ? "" : "ml-auto"}`}
-          >
-            + {t.list.add}
-          </Link>
+          <div className="col-span-2 mt-1.5 flex items-center gap-2 sm:mt-0 sm:ml-auto sm:gap-x-5">
+            {unassigned > 0 && (
+              <Link
+                href="/certificates"
+                className="flex-1 rounded-md border border-amber-300 bg-amber-50 px-3 py-3 text-center text-xs font-medium text-amber-800 hover:bg-amber-100 sm:flex-none sm:py-1.5"
+              >
+                {t.cert.unassigned} {unassigned}
+              </Link>
+            )}
+
+            <Link
+              href="/meters/new"
+              className="flex-1 rounded-md bg-slate-900 px-3 py-3 text-center text-xs font-medium text-white hover:bg-slate-700 sm:flex-none sm:py-1.5"
+            >
+              + {t.list.add}
+            </Link>
+          </div>
         )}
       </div>
 
       <div className="no-print flex flex-wrap items-center gap-2">
-        <div className="min-w-0 flex-1">
+        {/*
+          🔴 세로 폰(<640px)에서는 거르개가 **제 줄을 통째로** 쓴다(`w-full`),
+          640px 부터는 예전처럼 남는 자리만 쓴다(`sm:min-w-0 sm:flex-1`).
+          기준점을 `sm` 으로 둔 까닭은 위 현황판 주석과 같다 — 가로로 돌린
+          폰까지 한 줄 더 쓰게 만들 이유가 없다.
+
+          예전에는 폭에 관계없이 `min-w-0 flex-1` 이라 기준 폭이 0 이었다.
+          그래서 폰에서도 엑셀·인쇄 단추와 **같은 줄**에 놓였고, 거르개 상자가
+          남는 127px 만 받은 채 안에서 세 줄(검색·자산·상태)로 접혔다. 단추
+          둘은 그 세 줄의 **가운데 높이**에 떠서 「자산」 줄 옆에만 붙어 보였고
+          (사용자 폰 사진), 「상태」 줄 오른쪽은 비었다. 게다가 검색칸은
+          `min-w-[16rem]`(256px)이라 127px 상자를 **삐져나가** 있었다.
+
+          `w-full` 이면 거르개가 328px 을 다 쓰고 단추 둘이 아래 줄로 내려간다.
+          검색칸도 삐져나가지 않고, 선택칸이 넓어져 손가락으로 고르기 쉽다.
+        */}
+        <div className="w-full sm:w-auto sm:min-w-0 sm:flex-1">
           <FilterBar t={t} q={q} owner={owner} status={status} />
         </div>
         {sort !== "priority" && (

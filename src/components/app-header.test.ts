@@ -88,10 +88,32 @@ test("🔴 nowrap 은 flex-wrap 과 짝이다 — 없으면 페이지가 가로�
   assert.ok(right, "오른쪽 묶음을 찾지 못했다");
   const classes = right[1].split(/\s+/);
   assert.ok(classes.includes("flex-wrap"), "오른쪽 묶음이 줄을 바꾸지 못한다");
-  assert.ok(classes.includes("justify-end"), "줄이 바뀌면 둘째 줄이 왼쪽으로 흩어진다");
+  // 640px 부터는 줄이 바뀌어도 둘째 줄이 오른쪽에 붙는다. 폰에서만 왼쪽 끝을
+  // 맞춘다(아래 ④ 시험) — 그 경계가 `sm` 이라는 것까지 여기서 못 박는다.
+  assert.ok(
+    classes.includes("sm:justify-end"),
+    "줄이 바뀌면 둘째 줄이 왼쪽으로 흩어진다"
+  );
+  assert.equal(
+    classes.includes("justify-end"),
+    false,
+    "폰에서도 오른쪽으로 쏠린다 — 왼쪽이 텅 빈다"
+  );
 
   // 바깥 줄(머리말 전체)도 그대로 줄을 바꿀 수 있어야 한다.
   assert.match(appHeader, /className="mx-auto flex max-w-\[1400px\] flex-wrap/);
+});
+
+test("🔴 ④ 폰에서 머리말 둘째 줄이 왼쪽 끝을 맞춘다", () => {
+  const right = appHeader.match(/className="(ml-auto[^"]*)"/);
+  assert.ok(right, "오른쪽 묶음을 찾지 못했다");
+  const classes = right[1].split(/\s+/);
+
+  // 폰: 줄을 꽉 채워 왼쪽에서 시작한다(정렬 유틸리티가 없으면 flex-start).
+  assert.ok(classes.includes("w-full"), "폰에서 묶음이 제 내용 폭만 써 오른쪽에 쏠린다");
+  // 640px 부터: 예전 그대로 내용 폭 + ml-auto 로 오른쪽 끝.
+  assert.ok(classes.includes("sm:w-auto"), "넓은 화면에서 묶음이 줄을 통째로 먹는다");
+  assert.ok(classes.includes("ml-auto"), "넓은 화면에서 오른쪽 끝으로 가지 않는다");
 });
 
 test("🔴 거르개 라벨도 접히지 않는다 — 사진에서 '상 / 태' 로 끊겼다", () => {
