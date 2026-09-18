@@ -54,7 +54,13 @@ export function FilterBar({ t, q, owner, status }: Props) {
         className="min-w-[16rem] flex-1 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm focus:border-slate-500 focus:outline-none"
       />
 
-      <label className="flex items-center gap-1.5 text-sm text-slate-500">
+      {/*
+        🔴 `whitespace-nowrap` — 라벨 글자는 이 줄의 익명 flex 항목이라, 폰에서
+        자리가 모자라면 flex 가 min-content 까지 눌러 "상 / 태" 처럼 **한 글자씩
+        세로로** 끊어 놓았다(2026-09-18 사용자 폰 사진). 글자를 온전히 두고,
+        모자라면 바깥 flex-wrap 이 줄을 바꾸게 한다.
+      */}
+      <label className="flex items-center gap-1.5 text-sm whitespace-nowrap text-slate-500">
         {t.list.owner}
         <select
           value={owner}
@@ -70,7 +76,8 @@ export function FilterBar({ t, q, owner, status }: Props) {
         </select>
       </label>
 
-      <label className="flex items-center gap-1.5 text-sm text-slate-500">
+      {/* 위와 같은 이유. 사진에서 실제로 끊긴 것이 이쪽이다("상 / 태"). */}
+      <label className="flex items-center gap-1.5 text-sm whitespace-nowrap text-slate-500">
         {t.list.status}
         <select
           value={status}

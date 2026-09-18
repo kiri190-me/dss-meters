@@ -22,10 +22,12 @@ export const ja: Dictionary = {
   nav: {
     logout: "ログアウト",
     portal: "統合ログインへ",
+    portalShort: "ポータル",
     serviceMenu: "社内システムへの移動",
     language: "言語",
     admin: "管理者",
     notifySettings: "通知設定",
+    notifySettingsShort: "通知",
     viewer: "閲覧者",
   },
   login: {

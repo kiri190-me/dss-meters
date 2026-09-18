@@ -4,7 +4,7 @@ import { ja } from "./ja";
 import { ko } from "./ko";
 import { LANGUAGES, type Dictionary, type Lang } from "./types";
 
-export { LANGUAGES, LANGUAGE_LABEL } from "./types";
+export { LANGUAGES, LANGUAGE_LABEL, LANGUAGE_SHORT } from "./types";
 export type { Dictionary, Lang } from "./types";
 
 export const LANG_COOKIE = "lang";

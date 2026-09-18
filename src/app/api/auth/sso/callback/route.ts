@@ -108,7 +108,7 @@ export async function GET(request: Request) {
     userAgent: request.headers.get("user-agent"),
   });
 
-  // 머리말 위 서비스 메뉴바가 그릴 목록. 세션과 별도인 서명 쿠키에 담는다
+  // 머리말 **안**의 서비스 메뉴바가 그릴 목록. 세션과 별도인 서명 쿠키에 담는다
   // (service-menu-cookie.ts). 포털이 아직 그 클레임을 보내지 않으면 굽지 않고
   // 남아 있던 것을 지운다 — 로그인은 이 줄이 있으나 없으나 똑같이 끝난다.
   await writeServiceMenuCookie(identity.services);

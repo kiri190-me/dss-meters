@@ -20,11 +20,18 @@ export const ko = {
   nav: {
     logout: "로그아웃",
     portal: "통합 로그인으로",
-    /** 머리말 위 서비스 메뉴바의 이름. 화면에는 안 보이고 낭독기가 읽는다. */
+    /** 좁은 화면에서 대신 보이는 짧은 이름(위 notifySettingsShort 와 같은 방식). */
+    portalShort: "포털",
+    /** 머리말 **안** 서비스 메뉴바의 이름. 화면에는 안 보이고 낭독기가 읽는다. */
     serviceMenu: "사내 시스템 바로가기",
     language: "언어",
     admin: "관리자",
     notifySettings: "알림 설정",
+    /**
+     * 좁은 화면(<768px)에서 대신 보이는 짧은 이름. 긴 쪽은 sr-only 로 마크업에
+     * 남아 낭독기가 그대로 읽는다 — 지우는 것이 아니라 **눈에서만** 줄인다.
+     */
+    notifySettingsShort: "알림",
     viewer: "열람자",
   },
   login: {
