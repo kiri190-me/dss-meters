@@ -140,7 +140,10 @@ test("🔴 메뉴바는 남는 자리만 쓴다 — 로그아웃·포털이 밀�
   // 길어도 이 칸이 제 내용 폭까지 부풀지 못하게 막는다(목록은 자기 안에서
   // 가로로 굴러간다). 둘 중 하나라도 빠지면 서비스가 늘어날 때 오른쪽부터
   // 화면 밖으로 밀린다.
-  assert.match(bare, /<div className="min-w-0 flex-1">\{serviceMenu\}<\/div>/);
+  // `flex-auto` 는 폰에서만이다 — 시스템 이름을 감춘 뒤 메뉴가 오른쪽 묶음과
+  // 한 줄에 눌려 잘리지 않도록 줄을 가른다(app-header.test.ts). 768px 부터는
+  // `md:flex-1` 로 기준 폭 0 이 그대로 돌아온다.
+  assert.match(bare, /<div className="min-w-0 flex-auto md:flex-1">\{serviceMenu\}<\/div>/);
 
   // 🔴 이 머리말의 선: 로그아웃과 포털은 없애지 않는다(들어갈 자리가 없다고
   // 지우는 순간 폰에서 나갈 길이 사라진다).

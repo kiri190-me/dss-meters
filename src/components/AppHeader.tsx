@@ -49,7 +49,28 @@ export function AppHeader({
         줄바꿈 모양은 메뉴바가 들어오기 전과 완전히 같다.
       */}
       <div className="mx-auto flex max-w-[1400px] flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
-        <Link href="/" className="flex items-baseline gap-2">
+        {/*
+          시스템 이름. 🔴 폰(<768px)에서는 **눈에서만** 감춘다(2026-09-18 사용자
+          지시 — 폰 사진을 보고 "계측기 관리 문구를 지워 달라").
+
+          🔴 `sr-only` 이지 `hidden` 이 **아니다** — 마크업에 그대로 남아 화면
+          낭독기는 여전히 "계측기 관리 DSS" 를 읽고, 홈으로 가는 이 링크도
+          살아 있다. display:none 으로 지우면 폰에서 이 머리말에 시스템을
+          알리는 글자가 한 톨도 없게 된다.
+
+          `sr-only` 는 position:absolute 라 **flex 항목에서 빠진다** — 폭 123px
+          뿐 아니라 뒤따르던 gap-x-4 16px 까지 함께 사라져 그 자리가 전부
+          메뉴바로 간다. 기준점은 메뉴바가 이름을 감추는 폭과 **같은 768px**
+          (`md`)이다.
+
+          🔴 다만 이것만으로 머리말이 한 줄이 되지는 않는다: 메뉴 123 + gap 16
+          + 오른쪽 묶음 246(ja 278)= 385px 이라 폰 안쪽 폭 328px 을 넘는다.
+          아래 메뉴 칸의 `flex-auto` 주석 참조.
+        */}
+        <Link
+          href="/"
+          className="flex items-baseline gap-2 sr-only md:not-sr-only"
+        >
           <span className="text-lg font-semibold tracking-tight text-slate-900">
             {t.app.title}
           </span>
@@ -69,13 +90,21 @@ export function AppHeader({
           늘어날 때 오른쪽 로그아웃부터 화면 밖으로 밀린다. 목록은 넘치면
           **자기 안에서** 가로로 굴러간다(@dss/ui 의 `.dss-menu__list`).
 
-          폰(360px) 첫 줄 셈: 328(안쪽 폭) − 123(이름 "계측기 관리" 94 + gap 8 +
-          "DSS" 22) − 16(gap-x-4) = **188px** 이 이 칸 몫이고, 폰에서 메뉴는
-          아이콘만 보여 세 칸이 **123px** 이다(🔧 19 + 좌우 24 / 이름 첫 글자
-          14 + 좌우 24, 칸 사이 2). 65px 이 남아 잘리지 않는다. 일본어는
-          이름이 "計測器管理" 88px 로 오히려 6px 짧아 더 여유롭다.
+          🔴 폰에서만 `flex-auto`(= flex: 1 1 **auto**)인 이유. 이름을 감춘 뒤
+          기준 폭이 0 인 채로 두면 메뉴와 오른쪽 묶음이 **한 줄에 같이 놓이고**,
+          메뉴 몫이 328 − 246 − 16 = 66px(ja 는 34px)밖에 안 되어 아이콘 셋 중
+          하나 반만 보인다 — 「지금 여기」 밑줄이 달린 칸까지 잘린다. `flex-auto`
+          는 기준 폭을 **제 내용 폭(123px)** 으로 두므로 123 + 16 + 246 = 385 >
+          328 이 되어 오른쪽 묶음이 둘째 줄로 내려가고, 메뉴는 첫 줄을 온전히
+          쓴다. 세 칸이 다 보이고 굴릴 필요도 없다.
+
+          폰 메뉴 폭 셈: 아이콘만 보이므로 🔧 19 + 좌우 여백 24 = 43, 아이콘
+          없는 칸은 이름 첫 글자 14 + 24 = 38, 칸 사이 2 → 셋이 **123px**.
+
+          768px 부터는 `md:flex-1`(= flex: 1 1 **0%**)로 되돌아간다 — 이름이
+          눈에 돌아오고 한 줄에 다 들어가는 폭이라, 이 변경 전과 똑같이 그려진다.
         */}
-        <div className="min-w-0 flex-1">{serviceMenu}</div>
+        <div className="min-w-0 flex-auto md:flex-1">{serviceMenu}</div>
 
         {/*
           🔴 `flex-wrap` 과 `whitespace-nowrap` 은 **짝**이다(2026-09-18, 사용자

@@ -52,6 +52,12 @@ export const ko = {
     soon: "교정기한 임박",
     calibrating: "교정진행중",
     searchPlaceholder: "자산번호 · 계측기명 · 제조사 · 모델 · S/N 검색",
+    /**
+     * 폰(<768px)용 짧은 안내글. 긴 쪽은 14px 글자로 290px 이라 폰 검색칸의
+     * 안쪽(약 304px)에 아슬아슬 걸쳐 기기 글꼴에 따라 "…· S" 에서 잘렸다.
+     * placeholder 는 CSS 로 접거나 줄일 수 없어 글을 따로 둔다.
+     */
+    searchPlaceholderShort: "자산번호 · 계측기명 검색",
     owner: "자산",
     status: "상태",
     empty: "조건에 맞는 계측기가 없습니다.",

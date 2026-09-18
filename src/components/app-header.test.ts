@@ -95,7 +95,7 @@ test("🔴 nowrap 은 flex-wrap 과 짝이다 — 없으면 페이지가 가로�
 });
 
 test("🔴 거르개 라벨도 접히지 않는다 — 사진에서 '상 / 태' 로 끊겼다", () => {
-  const labels = [...filterBar.matchAll(/className="(flex items-center gap-1\.5[^"]*)"/g)];
+  const labels = [...filterBar.matchAll(/<label className="([^"]*)">/g)];
   assert.equal(labels.length, 2, "거르개 라벨이 둘이 아니다(자산·상태)");
   for (const [, classes] of labels) {
     assert.ok(
@@ -212,4 +212,57 @@ test("🔴 언어 줄임말은 제 언어를 쓰는 사람이 제 칸을 알아�
       `${lang} 줄임말이 로마자다`
     );
   }
+});
+
+// ── 4. 폰에서 시스템 이름을 감춘다 (2026-09-18 사용자 지시) ─────────────────
+
+test("🔴 시스템 이름은 폰에서 눈에서만 사라진다 — sr-only 이지 hidden 이 아니다", () => {
+  const brand = appHeader.match(/<Link\s+href="\/"\s+className="([^"]*)"/);
+  assert.ok(brand, "시스템 이름을 그리는 홈 링크를 찾지 못했다");
+  const classes = brand[1].split(/\s+/);
+
+  assert.ok(classes.includes("sr-only"), "폰에서 이름이 그대로 보인다");
+  assert.ok(classes.includes("md:not-sr-only"), "넓은 화면에서 이름이 돌아오지 않는다");
+  assert.equal(
+    classes.includes("hidden"),
+    false,
+    "display:none 으로 지웠다 — 낭독기에서도, 홈으로 가는 길에서도 사라진다"
+  );
+
+  // 글자와 링크는 마크업에 그대로 남는다.
+  assert.match(appHeader, /\{t\.app\.title\}/, "이름 글자를 통째로 뺐다");
+  assert.match(appHeader, /\{t\.app\.company\}/);
+  assert.match(appHeader, /href="\/"/, "홈으로 가는 길이 사라졌다");
+});
+
+test("🔴 이름을 감추는 기준점이 메뉴바의 「아이콘만」 기준점과 같다", () => {
+  // 어긋나면 그 사이 폭에서 「이름은 없는데 메뉴는 글자」인 어정쩡한 상태가 생긴다.
+  const menuCss = repoFile("vendor/dss-ui/src/service-menu/service-menu.css");
+  const breakpoint = menuCss.match(/@media not all and \(min-width: (\d+)px\)/);
+  assert.ok(breakpoint, "메뉴바의 기준점을 찾지 못했다");
+  assert.equal(breakpoint[1], "768", "메뉴바 기준점이 768px 이 아니다");
+
+  // 이 저장소가 Tailwind 의 md 기준점을 딴 값으로 덮지 않았는지.
+  const globals = repoFile("src/app/globals.css");
+  assert.equal(/--breakpoint-md:\s*(?!768px)/.test(globals), false);
+});
+
+test("🔴 이름을 감춘 뒤에도 메뉴 세 칸이 다 보인다 — flex-auto 가 그것을 지킨다", () => {
+  // `flex-1`(기준 폭 0)인 채로 이름만 감추면 메뉴와 오른쪽 묶음이 한 줄에
+  // 같이 놓여 메뉴 몫이 66px(ja 34px)로 줄고 「지금 여기」 칸까지 잘린다.
+  // `flex-auto`(기준 폭 = 제 내용 폭)면 줄이 갈려 메뉴가 첫 줄을 다 쓴다.
+  assert.match(
+    appHeader,
+    /<div className="min-w-0 flex-auto md:flex-1">\{serviceMenu\}<\/div>/,
+    "메뉴 칸의 기준 폭이 0 이라 폰에서 잘린다"
+  );
+
+  const INNER = 360 - 16 * 2;
+  const MENU = 43 + 2 + 38 + 2 + 38; // 폰: 아이콘만인 칸 셋
+  const GAP = 16;
+  const RIGHT_KO = 246; // 짧은 이름으로 줄인 뒤의 오른쪽 묶음(관리자)
+  assert.ok(
+    MENU + GAP + RIGHT_KO > INNER,
+    "메뉴와 오른쪽 묶음이 한 줄에 들어간다 — flex-auto 로 줄을 가를 이유가 없어졌으니 셈을 다시 하라"
+  );
 });

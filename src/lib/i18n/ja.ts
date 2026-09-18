@@ -48,6 +48,7 @@ export const ja: Dictionary = {
     soon: "校正期限間近",
     calibrating: "校正進行中",
     searchPlaceholder: "資産番号・名称・製作会社・モデル・S/N 検索",
+    searchPlaceholderShort: "資産番号・名称 検索",
     owner: "資産",
     status: "状態",
     empty: "条件に合う計測器がありません。",
