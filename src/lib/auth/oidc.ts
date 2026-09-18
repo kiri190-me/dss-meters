@@ -61,6 +61,16 @@ function sign(payload: string, secret: string): string {
   return createHmac("sha256", secret).update(payload).digest("base64url");
 }
 
+/**
+ * 문자열 비교는 앞에서부터 다른 지점까지의 시간이 달라, 서명을 한 글자씩
+ * 알아내는 공격이 이론상 가능하다. 서명을 맞대는 곳은 전부 이 함수를 쓴다.
+ */
+function signaturesMatch(expected: string, presented: string): boolean {
+  const a = Buffer.from(presented);
+  const b = Buffer.from(expected);
+  return a.length === b.length && timingSafeEqual(a, b);
+}
+
 export function sealTransaction(tx: SsoTransaction): string {
   const payload = Buffer.from(JSON.stringify(tx), "utf8").toString("base64url");
   return `${payload}.${sign(payload, env.ssoTxSecret)}`;
@@ -75,13 +85,7 @@ export function openTransaction(raw: string | undefined): SsoTransaction | null 
 
   const payload = raw.slice(0, dot);
   const presented = raw.slice(dot + 1);
-  const expected = sign(payload, env.ssoTxSecret);
-
-  // 문자열 비교는 앞에서부터 다른 지점까지의 시간이 달라, 서명을 한 글자씩
-  // 알아내는 공격이 이론상 가능하다.
-  const a = Buffer.from(presented);
-  const b = Buffer.from(expected);
-  if (a.length !== b.length || !timingSafeEqual(a, b)) return null;
+  if (!signaturesMatch(sign(payload, env.ssoTxSecret), presented)) return null;
 
   let parsed: unknown;
   try {
@@ -105,6 +109,53 @@ export function openTransaction(raw: string | undefined): SsoTransaction | null 
   if (tx.expiresAt <= Math.floor(Date.now() / 1000)) return null;
 
   return tx as SsoTransaction;
+}
+
+/* ------------------------------------------------------------------ */
+/* 브라우저에 맡기는 다른 값의 서명                                      */
+/*                                                                     */
+/* 왕복 쿠키 말고도 브라우저에 맡겨 두었다가 되받아야 하는 값이 있다      */
+/* (서비스 메뉴바 목록 — auth/service-menu-cookie.ts). 서명 방식과       */
+/* 비밀값을 여기서 함께 쓴다 — 로그인에 딸린 값이므로 비밀값이 둘로       */
+/* 갈리지 않는 편이 낫고, 서명·시간 안전 비교가 한 벌로 남는다.          */
+/* ------------------------------------------------------------------ */
+
+/**
+ * 값을 JSON 으로 굳혀 서명한다. 돌아오는 모양은 `payload.signature` 다.
+ *
+ * 🔴 `purpose` 는 **서명 대상에 함께 들어간다.** 그래서 한 쿠키의 값을 다른
+ * 쿠키에 옮겨 넣으면 서명이 어긋나 거절된다 — 비밀값을 같이 쓰면서도 용도가
+ * 섞이지 않게 하는 것이 이 한 조각의 전부다.
+ */
+export function sealSigned(purpose: string, value: unknown): string {
+  const payload = Buffer.from(JSON.stringify(value), "utf8").toString(
+    "base64url",
+  );
+  return `${payload}.${sign(`${purpose}.${payload}`, env.ssoTxSecret)}`;
+}
+
+/**
+ * 서명이 맞고 JSON 으로 읽히는 값만 돌려준다. 아니면 null 이다.
+ *
+ * 예외를 던지지 않는다 — 부르는 쪽이 「없는 것과 못 믿을 것」을 같게 다룰 수
+ * 있어야 한다. 무엇이 들어 있어야 하는지는 부르는 쪽이 다시 확인한다.
+ */
+export function openSigned(purpose: string, raw: string | undefined): unknown {
+  if (!raw) return null;
+
+  const dot = raw.indexOf(".");
+  if (dot <= 0) return null;
+
+  const payload = raw.slice(0, dot);
+  const presented = raw.slice(dot + 1);
+  const expected = sign(`${purpose}.${payload}`, env.ssoTxSecret);
+  if (!signaturesMatch(expected, presented)) return null;
+
+  try {
+    return JSON.parse(Buffer.from(payload, "base64url").toString("utf8"));
+  } catch {
+    return null;
+  }
 }
 
 /* ------------------------------------------------------------------ */
@@ -228,6 +279,17 @@ export type SsoIdentity = {
    * "안 왔다" 와 "이상한 값이 왔다" 는 다르게 다뤄야 하므로 unknown 으로 둔다.
    */
   role: unknown;
+  /**
+   * 이 사람이 들어갈 수 있는 사내 시스템 목록(포털의 `dss_services` 클레임).
+   * 머리말 위 서비스 메뉴바가 그릴 값이고, 권한 판정에는 쓰지 않는다 —
+   * 무엇에 들어갈 수 있는지는 포털만 알고, 여기서는 그것을 그대로 나른다.
+   *
+   * role 과 같은 이유로 unknown 이다. 다만 여기서는 "안 왔다" 와 "이상한
+   * 값이 왔다" 를 **가르지 않는다**: 포털의 그 기능이 아직 배포되지 않아
+   * 지금은 늘 없고, 어느 쪽이든 그릴 칸이 없으면 띠가 없는 것이 맞다
+   * (auth/service-menu-cookie.ts).
+   */
+  services: unknown;
 };
 
 export async function verifyIdToken(
@@ -259,6 +321,10 @@ export async function verifyIdToken(
       name: typeof payload.name === "string" ? payload.name : null,
       email: typeof payload.email === "string" ? payload.email : null,
       role: payload.role,
+      // sub 와 같은 payload 에서 읽으므로 같은 서명·발급자·수신자 보증을
+      // 받는다. 무엇을 그릴 수 있는 값으로 칠지는 service-menu-cookie.ts 와
+      // @dss/ui 가 정한다.
+      services: payload.dss_services,
     };
   } catch (error) {
     console.error("[sso] id_token 검증 실패:", error);

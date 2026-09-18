@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 
 import { endSessionUrl } from "@/lib/auth/oidc";
+import { clearServiceMenuCookie } from "@/lib/auth/service-menu-cookie";
 import { destroySession, getSessionUser } from "@/lib/auth/session";
 import { writeAudit } from "@/lib/audit";
 import { LANG_COOKIE, LANGUAGES, type Lang } from "@/lib/i18n";
@@ -48,5 +49,9 @@ export async function logoutAction(): Promise<void> {
     });
   }
   await destroySession();
+  // 🔴 서비스 메뉴바 목록도 같이 지운다. 남겨 두면 로그아웃한 사람의
+  // 브라우저에 「이 사람이 어떤 시스템을 쓰는지」가 그대로 남는다 — 공용 PC
+  // 에서는 그것만으로도 알려 줄 이유가 없는 정보다.
+  await clearServiceMenuCookie();
   redirect(endSessionUrl());
 }

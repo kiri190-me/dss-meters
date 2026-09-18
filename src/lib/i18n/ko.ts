@@ -20,6 +20,8 @@ export const ko = {
   nav: {
     logout: "로그아웃",
     portal: "통합 로그인으로",
+    /** 머리말 위 서비스 메뉴바의 이름. 화면에는 안 보이고 낭독기가 읽는다. */
+    serviceMenu: "사내 시스템 바로가기",
     language: "언어",
     admin: "관리자",
     notifySettings: "알림 설정",

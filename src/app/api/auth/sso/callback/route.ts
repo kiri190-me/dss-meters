@@ -18,6 +18,10 @@ import {
   SSO_TX_COOKIE_PATH,
   verifyIdToken,
 } from "@/lib/auth/oidc";
+import {
+  clearServiceMenuCookie,
+  writeServiceMenuCookie,
+} from "@/lib/auth/service-menu-cookie";
 import { createSession } from "@/lib/auth/session";
 import { resolveSsoLogin } from "@/lib/auth/sso-login";
 import { env } from "@/lib/env";
@@ -52,6 +56,8 @@ export async function GET(request: Request) {
 
   const fail = async (reason: string): Promise<Response> => {
     await clearTransactionCookie();
+    // 들어오지 못한 사람에게 앞사람의 시스템 목록을 남겨 두지 않는다.
+    await clearServiceMenuCookie();
     return redirectTo(`/login?error=${encodeURIComponent(reason)}`);
   };
 
@@ -101,6 +107,11 @@ export async function GET(request: Request) {
       request.headers.get("x-real-ip"),
     userAgent: request.headers.get("user-agent"),
   });
+
+  // 머리말 위 서비스 메뉴바가 그릴 목록. 세션과 별도인 서명 쿠키에 담는다
+  // (service-menu-cookie.ts). 포털이 아직 그 클레임을 보내지 않으면 굽지 않고
+  // 남아 있던 것을 지운다 — 로그인은 이 줄이 있으나 없으나 똑같이 끝난다.
+  await writeServiceMenuCookie(identity.services);
 
   await writeAudit({
     actor: result.user,

@@ -16,6 +16,7 @@ import {
   SSO_TX_COOKIE_PATH,
   SSO_TX_MAX_AGE_SECONDS,
 } from "@/lib/auth/oidc";
+import { clearServiceMenuCookie } from "@/lib/auth/service-menu-cookie";
 import { getSessionUser } from "@/lib/auth/session";
 import { env } from "@/lib/env";
 
@@ -28,6 +29,13 @@ export async function GET(request: Request) {
   if (await getSessionUser()) {
     return new Response(null, { status: 303, headers: { Location: returnTo } });
   }
+
+  // 🔴 여기부터는 **누구인지 모르는 사람**의 로그인이 시작된다. 앞사람이
+  // 남긴 서비스 메뉴바 목록을 먼저 지운다 — 남겨 두면 공용 PC 에서 남의
+  // 시스템 목록이 뒷사람 화면 위에 뜬다. 세션이 백채널 로그아웃이나 만료로
+  // 끊겨도 이 쿠키는 브라우저에 그대로 남아 있어서, 지울 자리가 여기다.
+  // (돌아온 뒤에는 콜백이 그 사람 것으로 다시 굽는다)
+  await clearServiceMenuCookie();
 
   const { authorizeUrl, transaction } = beginLogin(returnTo);
 

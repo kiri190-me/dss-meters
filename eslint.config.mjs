@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Separate repo pulled in as a git submodule. It lints itself with its own
+    // config — checking it here would fix someone else's code with our rules.
+    "vendor/dss-ui/**",
   ]),
 ]);
 
