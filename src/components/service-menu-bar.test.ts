@@ -135,15 +135,21 @@ test("🔴 머리말은 시스템 이름 다음, 오른쪽 글자 묶음 앞에 
 test("🔴 메뉴바는 남는 자리만 쓴다 — 로그아웃·포털이 밀려나지 않는다", () => {
   const bare = withoutComments(appHeader);
 
-  // `flex-1`(= flex: 1 1 0%)은 기준 폭이 0 이라 이름·언어전환·포털·로그아웃이
-  // 제 폭을 먼저 가져간 **뒤 남은 만큼만** 차지한다. `min-w-0` 은 안의 목록이
-  // 길어도 이 칸이 제 내용 폭까지 부풀지 못하게 막는다(목록은 자기 안에서
-  // 가로로 굴러간다). 둘 중 하나라도 빠지면 서비스가 늘어날 때 오른쪽부터
-  // 화면 밖으로 밀린다.
-  // `flex-auto` 는 폰에서만이다 — 시스템 이름을 감춘 뒤 메뉴가 오른쪽 묶음과
-  // 한 줄에 눌려 잘리지 않도록 줄을 가른다(app-header.test.ts). 768px 부터는
-  // `md:flex-1` 로 기준 폭 0 이 그대로 돌아온다.
-  assert.match(bare, /<div className="min-w-0 flex-auto md:flex-1">\{serviceMenu\}<\/div>/);
+  // 🔴 `shrink-0` 이다(2026-09-18 오후). 예전의 `min-w-0 flex-auto md:flex-1`
+  // 은 「**가로로 늘어선 목록**에 남는 자리를 준다」는 장치였다 — 기준 폭 0 에
+  // 목록이 제 안에서 굴러가는 짝. 메뉴바가 **드롭다운 단추 하나**가 된 뒤로는
+  // 그리는 것이 `white-space: nowrap` 인 단추뿐이라 **줄어들지 못한다**:
+  // 기준 폭을 0 으로 두면 자리가 모자랄 때 단추가 제 칸 밖으로 삐져나와
+  // 오른쪽 글자와 겹친다(768px 에서 이 칸 몫 87px < 단추 130px).
+  // `shrink-0` 이면 겹치는 대신 오른쪽 묶음이 flex-wrap 으로 줄을 바꾼다.
+  assert.match(bare, /<div className="shrink-0">\{serviceMenu\}<\/div>/);
+
+  // 되돌아가는 것을 막는다 — 위 둘은 드롭다운에서 뜻이 어긋난다.
+  assert.equal(
+    /className="[^"]*\bflex-(1|auto)\b/.test(bare),
+    false,
+    "메뉴 칸에 flex-1/flex-auto 가 돌아왔다 — 단추는 줄어들지 못해 글자와 겹친다"
+  );
 
   // 🔴 이 머리말의 선: 로그아웃과 포털은 없애지 않는다(들어갈 자리가 없다고
   // 지우는 순간 폰에서 나갈 길이 사라진다).
@@ -152,22 +158,28 @@ test("🔴 메뉴바는 남는 자리만 쓴다 — 로그아웃·포털이 밀�
 });
 
 test("🔴 flex-wrap 은 그대로다 — 끄면 버튼 안에서 글자가 접힌다", () => {
-  // 오른쪽 글자 묶음만으로 폰(360px)의 안쪽 폭 328px 을 넘는다(아래 셈).
-  // 줄바꿈을 끄면 그 묶음이 min-content 밑으로 눌려 "통합 / 로그인으로" 처럼
-  // 접힌다. 둘째 줄로 내려보내는 편이 낫다 — 그리고 메뉴바는 기준 폭이 0 이라
-  // 그 줄 나누기를 **바꾸지 못한다**(위 min-w-0 flex-1 시험).
+  // 이름 120 + 단추 59 + 오른쪽 묶음 246 + 여백 32 = 457 이라 폰(360px)의
+  // 안쪽 폭 328px 을 넘는다. 줄바꿈을 끄면 칸들이 min-content 밑으로 눌려
+  // "통합 / 로그인으로" 처럼 접힌다 — 오른쪽 묶음을 통째로 둘째 줄로
+  // 내려보내는 편이 낫다. 🔴 메뉴 칸이 `shrink-0` 이 된 뒤로는 줄 나누기에
+  // **참여한다**(예전엔 기준 폭 0 이라 참여하지 않았다) — 아래 폭 셈 시험이
+  // 그 결과가 몇 줄인지 못 박는다.
   const bare = withoutComments(appHeader);
   assert.match(bare, /className="mx-auto flex max-w-\[1400px\] flex-wrap/);
 });
 
-test("🔴 폰(360px)에서 메뉴 세 칸이 들어갈 자리가 남는다", () => {
+test("🔴 폰(360px)에서 시스템 이름과 메뉴 단추가 한 줄에 함께 선다", () => {
   // 실측(Windows·Malgun Gothic, 브라우저와 같은 글꼴 대체 순서)에서 나온 값들.
-  // 여기서 지키는 것은 「머리말 왼쪽이 더 길어지면 메뉴가 잘린다」는 선이다 —
-  // 이름을 길게 바꾸면 이 시험이 먼저 걸린다.
+  // 여기서 지키는 것은 「이름이 더 길어지면 단추가 둘째 줄로 밀린다」는 선이다 —
+  // 그렇게 되면 폰 첫 줄이 이름 하나뿐인 빈 줄이 된다.
   const INNER = 360 - 16 * 2; // px-4 좌우
   const GAP = 16; // gap-x-4
   const CO = 22 + 8; // "DSS"(12px) + gap-2
-  const MENU_NEEDED = 43 + 2 + 38 + 2 + 38; // 폰: 아이콘만인 칸 셋(🔧 19 / 첫 글자 14 + 좌우 여백 24)
+  // 🔴 폰의 드롭다운 **단추 하나** 폭(@dss/ui `.dss-menu__summary`, pointer:
+  // coarse): 좌우 여백 24 + 아이콘 19 + gap 6 + 삼각형 8 + 그 왼쪽 여백 2.
+  // 예전 「아이콘만인 칸 셋 123px」을 대신하는 값이고, 서비스가 다섯이 되어도
+  // 그대로다 — 그것이 드롭다운으로 바꾼 이유다.
+  const BUTTON = 24 + 19 + 6 + 8 + 2;
 
   // 18px 글자 폭 어림: 한글·가나·한자는 한 글자가 한 칸, 빈칸은 0.28칸.
   // tracking-tight(-0.025em)만큼 도로 뺀다.
@@ -181,11 +193,11 @@ test("🔴 폰(360px)에서 메뉴 세 칸이 들어갈 자리가 남는다", ()
     ["ja", ja],
   ] as const) {
     const left = titleWidth(dict.app.title) + CO;
-    const menuSlot = INNER - left - GAP;
+    const firstRow = left + GAP + BUTTON;
     assert.ok(
-      menuSlot >= MENU_NEEDED,
-      `${lang}: 머리말 왼쪽이 ${Math.round(left)}px 이라 메뉴 몫이 ` +
-        `${Math.round(menuSlot)}px 뿐이다 — 세 칸에 ${MENU_NEEDED}px 이 필요하다`
+      firstRow <= INNER,
+      `${lang}: 이름 ${Math.round(left)}px + 여백 ${GAP} + 단추 ${BUTTON} = ` +
+        `${Math.round(firstRow)}px 이라 폰 속폭 ${INNER}px 을 넘는다 — 단추가 둘째 줄로 밀린다`
     );
   }
 
@@ -196,17 +208,68 @@ test("🔴 폰(360px)에서 메뉴 세 칸이 들어갈 자리가 남는다", ()
   );
 });
 
-test("🔴 폰에서는 칸마다 아이콘만 보인다 — 칸 하나가 아이콘 하나 폭이다", () => {
+test("🔴 폰에서 아이콘만 남는 것은 **단추**다 — 펼친 목록은 이름을 그대로 보인다", () => {
   // 그 동작은 @dss/ui 가 CSS 로 한다(그쪽 시험이 자세히 본다). 여기서는 이
-  // 저장소가 기대는 그 규칙이 실제로 실려 있는지만 확인한다 — 없으면 폰에서
-  // 칸마다 이름까지 싣고 머리말 자리를 다투게 된다.
-  assert.match(menuCss, /@media not all and \(min-width: 768px\)/);
-  assert.match(menuCss, /\.dss-menu--inline \.dss-menu__name \{/);
+  // 저장소가 기대는 그 규칙이 실제로 실려 있는지만 확인한다.
+  //
+  // 🔴 겨냥이 2026-09-18 오후에 바뀌었다. 예전에는 `.dss-menu__name`(= 칸의
+  // 이름)이 폰에서 감춰졌는데, 이제 감추는 것은 `.dss-menu__label`(= **단추**에
+  // 선 이름)이다. `.dss-menu--inline .dss-menu__name` 규칙은 지금도 있지만
+  // 뜻이 전혀 다르다(긴 이름을 … 로 끊는 것) — 그것을 겨냥한 채 두면 시험은
+  // 초록인데 설명은 거짓인 상태가 된다.
+  const phoneBlock = menuCss.match(
+    /@media not all and \(min-width: 768px\) \{([\s\S]*?)\n\}/
+  );
+  assert.ok(phoneBlock, "폰 기준점(768px) 블록을 찾지 못했다");
+  assert.match(
+    phoneBlock[1],
+    /\.dss-menu--inline \.dss-menu__label \{/,
+    "폰에서 단추의 이름을 감추는 규칙이 없다 — 단추가 이름까지 싣고 자리를 다툰다"
+  );
   // 이름은 눈에서만 감춘다 — 낭독기는 그대로 읽어야 한다.
-  assert.match(menuCss, /clip-path: inset\(50%\)/);
-  // 머리말 안에 앉는 모습이 실제로 실려 있다(서브모듈 포인터가 옛 커밋이면
-  // 여기서 걸린다 — 그 판에는 이 규칙이 아예 없다).
+  assert.match(phoneBlock[1], /clip-path: inset\(50%\)/);
+  // 펼친 목록의 이름은 폰에서도 보인다(그 블록 안에 __name 을 감추는 규칙이 없다).
+  assert.equal(
+    /\.dss-menu__name \{[^}]*clip-path/.test(phoneBlock[1]),
+    false,
+    "펼친 목록의 이름까지 감췄다 — 이모지만 늘어선 목록은 고를 수가 없다"
+  );
+
+  // 머리말 안에 앉는 **드롭다운**이 실제로 실려 있다(서브모듈 포인터가 옛
+  // 커밋이면 여기서 걸린다 — 그 판에는 단추도 펼친 목록도 없다).
   assert.match(menuCss, /\.dss-menu\.dss-menu--inline \{/);
+  assert.match(menuCss, /\.dss-menu--inline \.dss-menu__dropdown \{/);
+  assert.match(menuCss, /\.dss-menu--inline \.dss-menu__summary \{/);
+});
+
+test("🔴 펼친 목록은 머리말 밖으로 **떠서** 그려진다 — 자르는 조상이 없어야 한다", () => {
+  // 목록이 position: absolute 라 머리말 높이를 넘어간다. 감싸는 쪽 어딘가에
+  // overflow: hidden 이 있으면 목록이 잘려 **아무것도 고를 수 없다**.
+  const listRule = menuCss.match(/\.dss-menu--inline \.dss-menu__list \{([\s\S]*?)\n\}/);
+  assert.ok(listRule, "펼친 목록 규칙을 찾지 못했다");
+  assert.match(listRule[1], /position: absolute;/);
+  assert.match(listRule[1], /z-index: 50;/);
+
+  // 머리말부터 최상위까지 자르는 줄이 없다. (Tailwind 로 걸면 overflow-hidden,
+  // CSS 로 걸면 overflow: hidden 이다.)
+  for (const relativePath of [
+    "src/components/AppHeader.tsx",
+    "src/app/(internal)/layout.tsx",
+    "src/app/layout.tsx",
+  ]) {
+    const bare = withoutComments(repoFile(relativePath));
+    assert.equal(
+      /\boverflow-hidden\b|\boverflow-(x-|y-)?clip\b/.test(bare),
+      false,
+      `${relativePath} 가 overflow 를 자른다 — 펼친 목록이 잘려 고를 수 없게 된다`
+    );
+  }
+  // 화면 전체에 거는 규칙도 없다.
+  assert.equal(
+    /\b(html|body)\s*\{[^}]*overflow[^}]*hidden/.test(repoFile("src/app/globals.css")),
+    false,
+    "globals.css 가 html/body 를 잘라 놓았다"
+  );
 });
 
 test("🔴 layout 이 목록과 「지금 여기」를 서버에서 풀어 내려보낸다", () => {

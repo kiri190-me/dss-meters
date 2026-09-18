@@ -214,29 +214,36 @@ test("🔴 언어 줄임말은 제 언어를 쓰는 사람이 제 칸을 알아�
   }
 });
 
-// ── 4. 폰에서 시스템 이름을 감춘다 (2026-09-18 사용자 지시) ─────────────────
+// ── 4. 시스템 이름은 폰에서도 보인다 (2026-09-18 오후 되돌림) ───────────────
 
-test("🔴 시스템 이름은 폰에서 눈에서만 사라진다 — sr-only 이지 hidden 이 아니다", () => {
-  const brand = appHeader.match(/<Link\s+href="\/"\s+className="([^"]*)"/);
+test("🔴 시스템 이름은 폰에서도 눈에 보인다 — 감추던 것을 되돌렸다", () => {
+  // 🔴 오전에 잠깐 `sr-only md:not-sr-only` 로 감춰 두었다. 메뉴바가 아직
+  // **가로로 늘어선 칸 셋**(123px)이던 때 그 셋이 다 보이게 하려던 것이었다.
+  // 메뉴바가 드롭다운 **단추 하나**(폰 59px)가 되면서 이유가 사라졌고,
+  // 이 저장소는 목록 화면의 본문 제목이 print-only 라 감추면 폰 첫 화면에
+  // 시스템 이름이 글자로 한 톨도 남지 않았다.
+  const brand = appHeader.match(/<Link href="\/" className="([^"]*)">/);
   assert.ok(brand, "시스템 이름을 그리는 홈 링크를 찾지 못했다");
   const classes = brand[1].split(/\s+/);
 
-  assert.ok(classes.includes("sr-only"), "폰에서 이름이 그대로 보인다");
-  assert.ok(classes.includes("md:not-sr-only"), "넓은 화면에서 이름이 돌아오지 않는다");
+  assert.equal(classes.includes("sr-only"), false, "폰에서 이름이 다시 감춰졌다");
+  assert.equal(classes.includes("hidden"), false, "이름을 display:none 으로 지웠다");
   assert.equal(
-    classes.includes("hidden"),
+    classes.includes("md:not-sr-only"),
     false,
-    "display:none 으로 지웠다 — 낭독기에서도, 홈으로 가는 길에서도 사라진다"
+    "감추지 않는데 되돌리는 유틸리티만 남았다 — 읽는 사람이 헷갈린다"
   );
 
-  // 글자와 링크는 마크업에 그대로 남는다.
+  // 글자와 링크는 그대로다.
   assert.match(appHeader, /\{t\.app\.title\}/, "이름 글자를 통째로 뺐다");
   assert.match(appHeader, /\{t\.app\.company\}/);
   assert.match(appHeader, /href="\/"/, "홈으로 가는 길이 사라졌다");
 });
 
-test("🔴 이름을 감추는 기준점이 메뉴바의 「아이콘만」 기준점과 같다", () => {
-  // 어긋나면 그 사이 폭에서 「이름은 없는데 메뉴는 글자」인 어정쩡한 상태가 생긴다.
+test("🔴 짧은 이름을 되돌리는 기준점이 메뉴바 단추의 「아이콘만」 기준점과 같다", () => {
+  // 알림·포털·언어전환이 긴 이름으로 돌아오는 `md:` 와, 메뉴 **단추**가
+  // 이름을 되찾는 기준점이 같아야 한다. 어긋나면 그 사이 폭에서 「오른쪽은
+  // 긴 이름인데 단추는 이모지 하나」인 어정쩡한 상태가 생긴다.
   const menuCss = repoFile("vendor/dss-ui/src/service-menu/service-menu.css");
   const breakpoint = menuCss.match(/@media not all and \(min-width: (\d+)px\)/);
   assert.ok(breakpoint, "메뉴바의 기준점을 찾지 못했다");
@@ -247,22 +254,30 @@ test("🔴 이름을 감추는 기준점이 메뉴바의 「아이콘만」 기�
   assert.equal(/--breakpoint-md:\s*(?!768px)/.test(globals), false);
 });
 
-test("🔴 이름을 감춘 뒤에도 메뉴 세 칸이 다 보인다 — flex-auto 가 그것을 지킨다", () => {
-  // `flex-1`(기준 폭 0)인 채로 이름만 감추면 메뉴와 오른쪽 묶음이 한 줄에
-  // 같이 놓여 메뉴 몫이 66px(ja 34px)로 줄고 「지금 여기」 칸까지 잘린다.
-  // `flex-auto`(기준 폭 = 제 내용 폭)면 줄이 갈려 메뉴가 첫 줄을 다 쓴다.
+test("🔴 이름을 되돌려도 폰에서 줄이 늘지 않는다 — 두 줄 그대로다", () => {
+  // 메뉴 칸은 `shrink-0` 이라 줄 나누기에 제 내용 폭(폰 59px)으로 참여한다.
   assert.match(
     appHeader,
-    /<div className="min-w-0 flex-auto md:flex-1">\{serviceMenu\}<\/div>/,
-    "메뉴 칸의 기준 폭이 0 이라 폰에서 잘린다"
+    /<div className="shrink-0">\{serviceMenu\}<\/div>/,
+    "메뉴 칸이 shrink-0 이 아니다 — 단추가 줄어들지 못해 글자와 겹친다"
   );
 
-  const INNER = 360 - 16 * 2;
-  const MENU = 43 + 2 + 38 + 2 + 38; // 폰: 아이콘만인 칸 셋
-  const GAP = 16;
+  const INNER = 360 - 16 * 2; // 328
+  const GAP = 16; // gap-x-4
+  const BRAND = 120; // "계측기 관리"(18px) + gap-2 + "DSS"(12px) — ja 는 116
+  const BUTTON = 24 + 19 + 6 + 8 + 2; // 폰 드롭다운 단추 59px
   const RIGHT_KO = 246; // 짧은 이름으로 줄인 뒤의 오른쪽 묶음(관리자)
+
+  // 첫 줄: 이름과 단추가 함께 선다.
   assert.ok(
-    MENU + GAP + RIGHT_KO > INNER,
-    "메뉴와 오른쪽 묶음이 한 줄에 들어간다 — flex-auto 로 줄을 가를 이유가 없어졌으니 셈을 다시 하라"
+    BRAND + GAP + BUTTON <= INNER,
+    "이름과 단추가 한 줄에 못 든다 — 첫 줄이 이름뿐인 빈 줄이 된다"
   );
+  // 둘째 줄: 오른쪽 묶음. 감추던 때(메뉴 123 + 16 + 246 = 385 > 328)도
+  // 둘째 줄이었으므로 **줄 수가 같다**.
+  assert.ok(
+    BRAND + GAP + BUTTON + GAP + RIGHT_KO > INNER,
+    "셋이 한 줄에 다 든다 — 셈을 다시 하고 이 시험의 설명을 고쳐라"
+  );
+  assert.ok(RIGHT_KO <= INNER, "오른쪽 묶음이 둘째 줄에서도 넘친다");
 });
