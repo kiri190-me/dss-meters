@@ -17,7 +17,7 @@ const nextConfig: NextConfig = {
    * 바뀔 때마다 여기까지 고치게 하면 같은 일을 또 겪는다.
    * (개발 서버에만 적용된다. next build 결과에는 영향이 없다.)
    */
-  allowedDevOrigins: ["192.168.0.*", "192.168.1.*"],
+  allowedDevOrigins: ["192.168.*.*"],
 };
 
 export default nextConfig;
