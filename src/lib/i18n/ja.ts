@@ -28,6 +28,8 @@ export const ja: Dictionary = {
     admin: "管理者",
     notifySettings: "通知設定",
     notifySettingsShort: "通知",
+    menu: "メニュー",
+    menuClose: "メニューを閉じる",
     viewer: "閲覧者",
   },
   login: {

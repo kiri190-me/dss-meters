@@ -282,22 +282,35 @@ test("🔴 종은 줄의 **맨 오른쪽 끝**이다 — 아니면 폰에서 펼
   assert.equal(appHeader.includes("@dss/ui"), false, "머리말이 @dss/ui 를 직접 부른다");
 });
 
-test("🔴 폰에서는 `ml-auto` 가 함께 있어야 종이 진짜 오른쪽 끝이다", () => {
-  // 이 저장소의 오른쪽 묶음은 폰(<640px)에서 `w-full` 이고 오른쪽 정렬을
-  // **끈다**(2026-09-18 사용자 폰 사진). 그래서 마크업에서 끝에 두는 것만으로는
-  // 종이 글자 덩이를 따라 왼쪽에 붙고, 관리자·일본어에서는 묶음이 제 안에서
-  // 줄을 바꿔 종이 둘째 줄 맨 왼쪽에 선다 — 그때 목록은 거의 통째로 화면
-  // 밖이다. 이 두 줄이 그 짝이고, 하나라도 바뀌면 여기서 걸린다.
+test("🔴 종이 줄의 **맨 오른쪽 끝**에 선다 — 그 자리를 만드는 것은 묶음의 `ml-auto` 다", () => {
+  // 🔴 2026-10-22 에 **그 자리를 만드는 장치가 바뀌었다.** 그 전(2026-09-18~)에는
+  //    오른쪽 묶음이 폰에서 `w-full` 이라 묶음 **안**에 남는 자리가 있었고, 종이
+  //    글자 덩이를 따라 왼쪽에 붙는 것을 종 자신의 `ml-auto` 가 막았다. 글자 칸
+  //    다섯이 ☰ 서랍으로 들어가면서 `w-full` 이 걷혔고(묶음이 제 내용 폭이 됐다),
+  //    이제 종을 오른쪽 끝으로 보내는 것은 **묶음의** `ml-auto` 하나다.
+  //    종 쪽의 `ml-auto` 는 안에 남는 자리가 0 이라 아무 일도 하지 않으므로 뺐다.
+  // 🔴 되돌리는 날에는 **둘이 함께** 움직여야 한다 — 묶음만 `w-full` 로 되돌리면
+  //    폰에서 종이 왼쪽에 붙는데 오류는 한 줄도 안 난다.
   assert.match(
     appHeader,
-    /className="ml-auto flex w-full flex-wrap items-center gap-3 sm:w-auto sm:justify-end"/,
-    "오른쪽 묶음의 폭·정렬이 바뀌었다 — 종의 ml-auto 가 아직 맞는지 다시 셈해야 한다",
+    /className="ml-auto flex items-center gap-3"/,
+    "오른쪽 묶음의 폭·정렬이 바뀌었다 — 종이 어떻게 오른쪽 끝에 서는지 다시 셈해야 한다",
   );
-  assert.match(
-    bellComponent,
-    /<NotificationBell[\s\S]*?className="ml-auto"[\s\S]*?\/>/,
-    "🔴 종에 ml-auto 가 없다 — 폰에서 펼친 목록의 왼쪽이 화면 밖으로 잘린다",
+  // 🔵 `w-full` 은 ☰ 서랍 안의 [로그아웃] 단추에도 쓰인다(세로로 꽉 채우는 것이라
+  //    맞다). 여기서 보는 것은 **머리말 줄의 오른쪽 묶음**뿐이다.
+  assert.equal(
+    /className="ml-auto[^"]*\bw-full\b/.test(appHeader),
+    false,
+    "🔴 오른쪽 묶음이 다시 줄을 통째로 쓴다 — 종 하나가 제 줄을 차지해 폰 머리말이 두 줄이 된다",
   );
+  assert.equal(
+    bellComponent.includes("ml-auto"),
+    false,
+    "🔴 종에 ml-auto 가 돌아왔다 — 지금 구조에서는 아무 일도 하지 않는다. 묶음도 함께 되돌렸는지 보라",
+  );
+  // 종은 그 묶음의 **마지막** 자식이다 — 뒤에 무언가 더 서면 목록이 밀린다.
+  const bellAt = appHeader.indexOf("{notificationBell}");
+  assert.ok(bellAt > appHeader.indexOf('className="ml-auto'), "종이 묶음 앞에 있다");
 });
 
 test("🔴 종을 래퍼 <div> 로 감싸지 않는다 — 알림이 없을 때 빈 자리와 여백이 남는다", () => {
