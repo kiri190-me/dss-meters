@@ -374,21 +374,128 @@ test("🔴 보낼 것이 없으면 메일 서버에 붙지도 않는다 — 가�
   assert.ok(계측기 < 붙는자리 && 사람 < 붙는자리);
 });
 
-test("🔴 기록 방식이 그대로다 — web_notifications 에 한 줄, 결과는 보낸 수로 가른다", () => {
-  assert.match(script, /await db\.insert\(webNotifications\)\.values\(\{/);
+test("🔴 적는 값이 그대로다 — web_notifications 에 한 줄, 결과는 보낸 수로 가른다", () => {
+  assert.match(script, /await db\s*\n?\s*\.insert\(webNotifications\)\s*\n?\s*\.values\(\{/);
   assert.match(script, /result: sent > 0 \? "SENT" : "FAILED",/);
   assert.match(script, /recipientCount: sent,/);
   assert.match(
     script,
     /error: failures\.length > 0 \? failures\.join\(" \/ "\)\.slice\(0, 2000\) : null,/,
   );
-  // 🔴 수동 발송 쪽의 느슨한 규칙이 배치로 새지 않았다. 배치가 충돌을 삼키면
-  //    "두 번 보내지 않는다" 는 자물쇠가 조용히 풀린다.
+});
+
+test("🔴 중복 발송을 막는 자물쇠는 **보내기 전**의 검사다 — 그 차례가 그대로다", () => {
+  // 🔴 2026-11-18 에 이 시험의 주장을 고쳤다. 전에는 "배치에 onConflict 가
+  //    있으면 안 된다 — 두 번 보내지 않는 자물쇠가 풀린다" 로 적혀 있었는데
+  //    **전제가 틀렸다.** 메일은 기록보다 **먼저** 나가므로, 유니크 인덱스는
+  //    애초에 중복 **발송**을 막은 적이 없다(기록이 겹치지 않게 할 뿐이다).
+  //    실제로 막는 것은 아래 두 가지이고, 그것이 그대로인지를 재는 것이 맞다.
+  const 일일가드 = script.indexOf("if (!scheduled && !FORCE && !GIVEN_YM)");
+  const 중복가드 = script.indexOf("if (!FORCE && (await alreadySent(ym)))");
+  const 발송 = script.indexOf("deliverNotifyMails({");
+  assert.ok(일일가드 > 0 && 중복가드 > 0 && 발송 > 0, "가드를 찾지 못했다");
+  assert.ok(일일가드 < 중복가드 && 중복가드 < 발송, "🔴 가드가 발송 뒤로 밀렸다");
+});
+
+/* ── 2-ㄴ. 🔴 --force 로 이미 보낸 기한을 보내도 기록 없이 끝나지 않는다 ──
+ * 2026-11-18 까지 `--force` 는 제 주된 쓰임에서 **터졌다.** alreadySent 만
+ * 건너뛰고 기록 INSERT 는 그대로라, 이미 성공 기록이 있는 기한에 쓰면
+ * **메일은 전부 나간 뒤** 유니크 위반으로 터져 감사 로그도 못 남기고 exit 1
+ * 로 끝났다. 사람은 "실패했다" 고 읽는다 — 11-01 사고의 정확한 거울이다. */
+
+test("🔴 기록에 부딪혀도 터지지 않는다 — 있는 행을 그대로 둔다", () => {
+  assert.match(script, /\.onConflictDoNothing\(\)/);
+  assert.match(script, /\.returning\(\{ id: webNotifications\.id \}\);/);
+  assert.match(script, /const recorded = await db/);
+});
+
+test("🔴 **덮어쓰지 않는다** — 처음 보낸 날이 사라지면 사고를 되짚을 수 없다", () => {
   assert.equal(
-    /onConflict/.test(script),
+    /onConflictDoUpdate/.test(script),
     false,
-    "🔴 배치가 유니크 충돌을 삼키게 바뀌었다",
+    "🔴 충돌할 때 기존 행을 덮어쓴다 — sent_on 이 사라진다",
   );
+  assert.equal(
+    /db\.update\(webNotifications\)|\.update\(webNotifications\)/.test(script),
+    false,
+    "🔴 배치가 발송 기록 행을 고친다",
+  );
+});
+
+test("🔴 부딪힌 뒤에도 **감사 로그까지 간다** — 사이에 돌아가는 길이 없다", () => {
+  // 터져서 여기까지 못 오던 것이 이 고침의 핵심이다. 두 기록 사이에 return 이나
+  // throw 가 끼면 "메일은 나갔는데 아무 데도 안 남는" 상태가 그대로 돌아온다.
+  const 기록 = script.indexOf("const recorded = await db");
+  const 감사 = script.indexOf("db.insert(webAuditLogs)");
+  assert.ok(기록 > 0 && 감사 > 0);
+  assert.ok(기록 < 감사, "🔴 감사 로그가 기록보다 앞이다");
+
+  const 사이 = script.slice(기록, 감사);
+  assert.equal(/\breturn\b/.test(사이), false, "🔴 사이에 돌아가는 길이 생겼다");
+  assert.equal(/\bthrow\b/.test(사이), false, "🔴 사이에서 던진다");
+  assert.equal(/\bcatch\b/.test(사이), false, "🔴 사이에 삼키는 자리가 생겼다");
+});
+
+test("🔴 기록을 그대로 둔 사실이 로그에 보인다 — 조용히 넘어가지 않는다", () => {
+  assert.match(script, /if \(recorded\.length === 0\) \{/);
+  assert.match(script, /say\(\s*`기록은 그대로 둡니다 — \$\{ym\} 기한의 성공 기록이 이미 있습니다`/);
+  assert.match(script, /처음 보낸 날 \$\{first\.sentOn\}/);
+  // 그 줄이 "기록을 안 적은 경우" 안에만 있어야 한다 — 평소에 뜨면 거짓말이다.
+  const 분기 = script.indexOf("if (recorded.length === 0) {");
+  const 말하는자리 = script.indexOf("기록은 그대로 둡니다");
+  assert.ok(분기 < 말하는자리);
+});
+
+test("🔴 종료 코드는 **보낸 수**로만 정해진다 — 기록을 못 적은 것은 실패가 아니다", () => {
+  // 메일이 다 나갔으면 0 이어야 한다. 전에는 기록에 부딪혀 터지면서 1 이 됐고,
+  // 스케줄러가 '비정상 종료' 로 표시해 사람이 "안 나갔구나" 로 읽었다.
+  assert.match(script, /if \(sent === 0\) process\.exitCode = 1;/);
+  // 코드를 **1 로 정하는** 자리는 둘뿐이다 — 한 통도 못 보냈을 때와,
+  // 맨 아래에서 통째로 터졌을 때. (`flushLog(process.exitCode !== 1)` 은 읽기만 한다.)
+  assert.equal(
+    (script.match(/process\.exitCode = 1/g) ?? []).length,
+    2,
+    "🔴 종료 코드를 1 로 정하는 자리가 늘었다",
+  );
+  const 분기 = script.slice(
+    script.indexOf("if (recorded.length === 0) {"),
+    script.indexOf("db.insert(webAuditLogs)"),
+  );
+  assert.equal(
+    /exitCode/.test(분기),
+    false,
+    "🔴 기록을 못 적었다고 실패로 끝낸다",
+  );
+});
+
+test("🔵 .onConflictDoNothing() 이 정말 '그대로 둔다' 로 번역된다 — 뿜는 SQL 을 본다", async () => {
+  // 🔴 이 조각은 DB 에 붙지 못하는 자리에서 만들었다. 그래서 "충돌해도 안
+  //    터진다" 를 직접 돌려 볼 수가 없다 — 대신 **무슨 문장이 나가는지**를
+  //    본다. toSQL() 은 글자를 만들 뿐 서버에 가지 않는다.
+  const { db } = await import("./db");
+  const { webNotifications } = await import("./db/schema");
+
+  const built = db
+    .insert(webNotifications)
+    .values({
+      targetYm: "2026-12",
+      sentOn: "2026-11-18",
+      meterCount: 2,
+      recipientCount: 3,
+      result: "SENT",
+      error: null,
+    })
+    .onConflictDoNothing()
+    .returning({ id: webNotifications.id })
+    .toSQL();
+
+  // 실측(2026-11-18, drizzle-orm 0.45): insert into "web_notifications" (…)
+  //   values (default, $1, …, default) on conflict do nothing returning "id"
+  assert.match(built.sql, /insert into "web_notifications"/i);
+  assert.match(built.sql, /on conflict do nothing/i);
+  assert.match(built.sql, /returning "id"/i);
+  // 🔴 덮어쓰는 쪽으로 번역되면 처음 보낸 날이 사라진다.
+  assert.equal(/do update/i.test(built.sql), false, built.sql);
 });
 
 test("🔴 배치의 감사 로그는 NOTIFY_SEND 다 — 수동 발송과 가른다", () => {

@@ -6,7 +6,10 @@
  *   npm run send-notify -- --force       1일이 아니어도, 이미 보냈어도 보낸다
  *   npm run send-notify -- --ym=2027-01  그 기한을 대상으로 (재발송·확인용)
  *
- * 작업 스케줄러에 **매일** 걸어 두면 된다. 1일이 아닌 날은 아무것도 하지 않는다.
+ * **NAS 의 DSM 작업 스케줄러**(「DSS 교정 알림」)가 매일 09:00 에 root 로
+ * `/volume1/dss/jobs/notify-daily.sh` 를 돌리고, 그 스크립트가 도구 컨테이너에서
+ * 이것을 부른다. 1일이 아닌 날은 아무것도 하지 않는다 — 매일 걸어 두어도 된다.
+ * (2026-09-18 NAS 배포 전에는 개발 PC 의 Windows 작업 스케줄러였다.)
  * 날짜 계산을 스케줄러가 아니라 이 안에서 하는 이유는, 스케줄러 설정이
  * 어딘가에서 조용히 바뀌어도 규칙은 코드에 남아 있게 하기 위해서다.
  *
@@ -32,6 +35,12 @@ loadLocalEnv();
  * 화면에 찍은 것을 그대로 로그 파일에도 남긴다 (백업 스크립트와 같은 방식).
  * 작업 스케줄러로 돌 때는 아무도 화면을 보지 않는다. 1일이 아니라 그냥
  * 끝난 날도 남겨 두어야 "돌기는 했는지" 를 나중에 알 수 있다.
+ *
+ * 🔴 **NAS 에서는 이 파일이 남지 않는다.** 도구 컨테이너는 `--rm` 으로 잠깐
+ * 떴다 사라지고 `/app/logs` 에 볼륨이 붙어 있지 않다. 거기서 실제로 남는 것은
+ * 이것을 부르는 jobs/notify-daily.sh 가 stdout 을 받아 적는
+ * `/volume1/dss/setup/logs/notify-*.log` 다 — 그래서 **say() 로 찍는 줄이 곧
+ * 운영 기록**이다. 이 파일은 개발 PC 에서 손으로 돌릴 때에 쓸모가 있다.
  */
 const logLines: string[] = [];
 function say(line = ""): void {
@@ -76,9 +85,8 @@ async function main() {
   try {
     const { addMonths, currentDate } = await import("../src/lib/meters");
     const { listNotifyTargets, notifyTargetYm } = await import("../src/lib/notify");
-    const { alreadySent, listActiveRecipients } = await import(
-      "../src/lib/notify-admin"
-    );
+    const { alreadySent, findSentNotification, listActiveRecipients } =
+      await import("../src/lib/notify-admin");
     const { deliverNotifyMails, renderNotifyBodies } = await import(
       "../src/lib/notify-send"
     );
@@ -154,14 +162,43 @@ async function main() {
 
     // 한 명이라도 보냈으면 성공으로 남긴다. 전부 실패면 실패로 남기고
     // 다음 번 실행에서 다시 시도할 수 있게 한다.
-    await db.insert(webNotifications).values({
-      targetYm: ym,
-      sentOn: today,
-      meterCount: meters.length,
-      recipientCount: sent,
-      result: sent > 0 ? "SENT" : "FAILED",
-      error: failures.length > 0 ? failures.join(" / ").slice(0, 2000) : null,
-    });
+    //
+    // 🔴 **부딪혀도 터지지 않는다** (2026-11-18). 한 기한에 성공 기록은 하나뿐이고
+    //    (web_notifications_target_ym_uq — result='SENT' 인 행에만 걸린 유니크
+    //    인덱스다), --force 로 이미 보낸 기한을 다시 보내면 바로 여기서 부딪힌다.
+    //    그 전까지는 그대로 터졌다 — **메일은 이미 다 나간 뒤**라서 아래 감사
+    //    로그까지 가지도 못하고 exit 1 로 끝났고, 사람은 "실패했다"고 읽었다.
+    //    메일은 나갔는데 아무 데도 안 남는, 가장 나쁜 모양이다.
+    //    이제는 부딪히면 **있는 행을 그대로 둔다.** 덮어쓰지 않는 까닭은 덮어쓰면
+    //    처음 보낸 날(sent_on)이 사라지기 때문이다 — 그 값이 "언제 나갔다는데
+    //    못 받았다" 를 나중에 되짚는 유일한 근거다. 화면의 수동 발송 단추도 같은
+    //    규율이다(app/actions/notify.ts 의 resendNotifyAction).
+    // 🔵 자물쇠가 풀리는 것이 아니다. 1일 배치가 두 번 보내지 않는 것은 위의
+    //    alreadySent 검사가 막는 것이고(메일은 그보다 먼저 나간다), 이 인덱스는
+    //    처음부터 **기록**이 겹치지 않게 하는 장치다. 둘은 다른 일을 한다.
+    const recorded = await db
+      .insert(webNotifications)
+      .values({
+        targetYm: ym,
+        sentOn: today,
+        meterCount: meters.length,
+        recipientCount: sent,
+        result: sent > 0 ? "SENT" : "FAILED",
+        error: failures.length > 0 ? failures.join(" / ").slice(0, 2000) : null,
+      })
+      .onConflictDoNothing()
+      .returning({ id: webNotifications.id });
+
+    if (recorded.length === 0) {
+      // 🔴 조용히 넘어가지 않는다. 그러면 다음 사람이 "보냈다는데 기록은 왜
+      //    안 늘지" 로 또 헤맨다. 메일이 나간 것과 기록을 그대로 둔 것은
+      //    **둘 다** 로그에 보여야 한다.
+      const first = await findSentNotification(ym);
+      say(
+        `기록은 그대로 둡니다 — ${ym} 기한의 성공 기록이 이미 있습니다` +
+          (first ? ` (처음 보낸 날 ${first.sentOn}, ${first.recipientCount}명).` : "."),
+      );
+    }
 
     // 중요한 행위는 감사 로그에도 남긴다. 배치라 사람(actor)이 없다.
     // writeAudit 는 next/headers 를 쓰므로 여기서는 직접 넣는다.
