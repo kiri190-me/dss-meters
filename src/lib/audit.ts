@@ -31,6 +31,8 @@ export type AuditAction =
   | "NOTIFY_RECIPIENT_DELETE"
   | "NOTIFY_TEMPLATE_UPDATE"
   | "NOTIFY_SEND"
+  /** 사람이 설정 화면에서 손으로 다시 보낸 것. 배치가 보낸 것(NOTIFY_SEND)과 가른다. */
+  | "NOTIFY_RESEND"
   | "DATA_IMPORT"
   | "DATA_FIX";
 

@@ -12,6 +12,11 @@
  *
  * 같은 기한을 두 번 보내지 않는다 — web_notifications 에 성공 기록이 있으면 건너뛴다.
  * PowerShell 이 아니라 TypeScript 로 작성한다 — NAS 리눅스 컨테이너에서도 돌아야 한다.
+ *
+ * 🔴 **실제로 메일을 내보내는 몸통은 `src/lib/notify-send.ts` 에 있다.** 설정
+ * 화면의 수동 발송 단추가 같은 코드를 쓰기 위해 2026-11-18 에 그리로 옮겼다.
+ * 옮기면서 이 스크립트의 동작은 한 글자도 바꾸지 않았다 — 언제 보내는지,
+ * 무엇을 건너뛰는지, 기록을 어떻게 남기는지는 여전히 **여기서** 정한다.
  */
 import { appendFile, mkdir } from "node:fs/promises";
 import { EOL } from "node:os";
@@ -74,12 +79,10 @@ async function main() {
     const { alreadySent, listActiveRecipients } = await import(
       "../src/lib/notify-admin"
     );
-    const { loadTemplate, renderNotifyMail } = await import(
-      "../src/lib/mail/notify-mail"
+    const { deliverNotifyMails, renderNotifyBodies } = await import(
+      "../src/lib/notify-send"
     );
-    const { createTransport, fromAddress } = await import(
-      "../src/lib/mail/transport"
-    );
+    const { createTransport } = await import("../src/lib/mail/transport");
     const { db } = await import("../src/lib/db");
     const { webAuditLogs, webNotifications } = await import(
       "../src/lib/db/schema"
@@ -127,20 +130,7 @@ async function main() {
     );
 
     // 언어별로 한 번씩만 만든다. 같은 언어를 쓰는 사람이 여럿이어도 본문은 하나다.
-    const bodies = new Map<string, Awaited<ReturnType<typeof renderNotifyMail>>>();
-    for (const lang of new Set(recipients.map((r) => r.lang))) {
-      const l = lang === "ja" ? "ja" : "ko";
-      bodies.set(
-        lang,
-        renderNotifyMail({
-          meters,
-          ym,
-          lang: l,
-          url,
-          template: await loadTemplate(l),
-        }),
-      );
-    }
+    const bodies = await renderNotifyBodies({ meters, recipients, ym, url });
 
     if (DRY) {
       for (const [lang, mail] of bodies) {
@@ -153,33 +143,14 @@ async function main() {
       return;
     }
 
-    const transport = createTransport();
-    let sent = 0;
-    const failures: string[] = [];
-
-    try {
-      for (const person of recipients) {
-        const mail = bodies.get(person.lang)!;
-        try {
-          await transport.sendMail({
-            from: fromAddress(),
-            to: person.name ? `${person.name} <${person.email}>` : person.email,
-            subject: mail.subject,
-            text: mail.text,
-            html: mail.html,
-          });
-          sent += 1;
-          say(`  보냄  ${person.email}`);
-        } catch (error) {
-          // 한 사람에게 실패해도 나머지는 보낸다.
-          const message = error instanceof Error ? error.message : String(error);
-          failures.push(`${person.email}: ${message}`);
-          say(`  실패  ${person.email} — ${message}`);
-        }
-      }
-    } finally {
-      transport.close();
-    }
+    // 보내는 몸통은 화면의 수동 발송 단추와 같은 것을 쓴다. 한 사람에게
+    // 실패해도 나머지는 보내고, 끝나면 연결을 닫는 것까지 그쪽이 한다.
+    const { sent, failures } = await deliverNotifyMails({
+      recipients,
+      bodies,
+      transport: createTransport(),
+      onLine: say,
+    });
 
     // 한 명이라도 보냈으면 성공으로 남긴다. 전부 실패면 실패로 남기고
     // 다음 번 실행에서 다시 시도할 수 있게 한다.

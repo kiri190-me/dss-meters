@@ -8,14 +8,20 @@ import {
 import { ConfirmButton } from "@/components/ConfirmButton";
 import { MailTemplateForm } from "@/components/MailTemplateForm";
 import { RecipientForm } from "@/components/RecipientForm";
+import { ResendNotifyForm } from "@/components/ResendNotifyForm";
 import { isAdmin } from "@/lib/auth/guards";
 import { getSessionUser } from "@/lib/auth/session";
 import { formatDateTime } from "@/lib/format";
 import { getDictionary, LANGUAGE_LABEL, LANGUAGES } from "@/lib/i18n";
 import { loadTemplate } from "@/lib/mail/notify-mail";
-import { addMonths, currentDate } from "@/lib/meters";
-import { listNotifications, listRecipients } from "@/lib/notify-admin";
-import { listNotifyTargets, notifyTargetYm } from "@/lib/notify";
+import { currentDate } from "@/lib/meters";
+import {
+  findSentNotification,
+  listManualResends,
+  listNotifications,
+  listRecipients,
+} from "@/lib/notify-admin";
+import { listNotifyTargets, nextNotifyYm } from "@/lib/notify";
 
 const CARD = "rounded-lg border border-slate-200 bg-white";
 const CARD_HEAD =
@@ -24,6 +30,30 @@ const CARD_HEAD =
 const TH =
   "whitespace-nowrap px-3 py-2 text-left text-xs font-semibold text-slate-500";
 const TD = "whitespace-nowrap px-3 py-2 text-sm";
+
+const BADGE = "rounded-full px-2 py-0.5 text-xs font-medium";
+
+/**
+ * 발송 기록 한 줄. **두 자리**에서 온다 —
+ * 배치가 적는 `web_notifications` 와, 수동 발송이 적는 감사 로그.
+ *
+ * 🔴 수동 발송을 `web_notifications` 에 못 적는 까닭은
+ * `app/actions/notify.ts` 의 `resendNotifyAction` 주석에 있다(그 표는 기한당
+ * 성공 기록 하나만 허락하는 자물쇠다). 그래서 표가 배치 기록만 보여 주면
+ * 다시 보내기를 누른 사람 눈에는 아무 일도 안 일어난 것처럼 보이고, 또 누른다.
+ */
+type HistoryRow = {
+  key: string;
+  /** 줄을 세우는 기준. 두 자리에서 온 줄을 한 차례로 섞는다. */
+  at: Date;
+  on: string;
+  ym: string;
+  meters: number;
+  people: number;
+  label: string;
+  tone: string;
+  note: string;
+};
 
 /**
  * 교정 기한 알림 설정.
@@ -36,14 +66,17 @@ export default async function NotifySettingsPage() {
   const user = await getSessionUser();
   if (!isAdmin(user)) notFound();
 
-  const today = currentDate();
   // 미리보기용 숫자. 오늘이 1일이 아니어도 감이 오도록 다음 달을 쓴다.
-  const sampleYm = notifyTargetYm(today) ?? addMonths(today.slice(0, 7), 1);
+  // 🔴 수동 발송 단추가 **같은 함수**로 기한을 정한다 — 여기 적힌 것과 실제로
+  //    나가는 것이 어긋나면 메일이 나간 뒤에야 드러난다.
+  const sampleYm = nextNotifyYm();
 
-  const [recipients, history, targets, koTemplate, jaTemplate] =
+  const [recipients, history, resends, lastSent, targets, koTemplate, jaTemplate] =
     await Promise.all([
       listRecipients(),
       listNotifications(),
+      listManualResends(),
+      findSentNotification(sampleYm),
       listNotifyTargets(sampleYm),
       loadTemplate("ko"),
       loadTemplate("ja"),
@@ -51,6 +84,43 @@ export default async function NotifySettingsPage() {
 
   const templates = { ko: koTemplate, ja: jaTemplate };
   const active = recipients.filter((r) => r.isActive).length;
+
+  const rows: HistoryRow[] = [
+    ...history.map((h) => ({
+      key: h.id,
+      at: h.createdAt,
+      on: h.sentOn,
+      ym: h.targetYm,
+      meters: h.meterCount,
+      people: h.recipientCount,
+      label: h.result === "SENT" ? "보냄" : "실패",
+      tone:
+        h.result === "SENT"
+          ? "bg-emerald-100 text-emerald-800"
+          : "bg-red-100 text-red-800",
+      note: h.error ?? formatDateTime(h.createdAt, lang),
+    })),
+    ...resends.map((r) => ({
+      key: r.id,
+      at: r.at,
+      // 감사 로그에는 "보낸 날" 칸이 따로 없다. 적힌 시각을 한국 시간의
+      // 날짜로 읽는다 — UTC 로 자르면 아홉 시간 동안 하루 전으로 보인다.
+      on: currentDate(r.at),
+      ym: r.targetYm,
+      meters: r.meterCount,
+      people: r.sent,
+      label: r.sent > 0 ? "재발송" : "재발송 실패",
+      tone:
+        r.sent > 0
+          ? "bg-amber-100 text-amber-800"
+          : "bg-red-100 text-red-800",
+      note: r.error
+        ? `${r.actorName} — ${r.error}`
+        : `${r.actorName} · ${formatDateTime(r.at, lang)}`,
+    })),
+  ]
+    .sort((a, b) => b.at.getTime() - a.at.getTime())
+    .slice(0, 12);
 
   return (
     <div className="space-y-4">
@@ -84,6 +154,16 @@ export default async function NotifySettingsPage() {
           교정대상아님 · 고장(교정불가) · 반납·발송 · 교정진행중 상태는 알리지
           않습니다.
         </p>
+
+        {/* 1일에 나갔어야 했던 메일을 지금 다시 보내는 자리.
+            위 문구가 말하는 바로 그 대상이 그대로 나간다. */}
+        <ResendNotifyForm
+          ym={sampleYm}
+          meterCount={targets.length}
+          recipientCount={active}
+          sentOn={lastSent?.sentOn ?? null}
+          sentCount={lastSent?.recipientCount ?? null}
+        />
       </div>
 
       {/* 받는 사람 */}
@@ -186,11 +266,12 @@ export default async function NotifySettingsPage() {
       <div className={CARD}>
         <div className={CARD_HEAD}>
           <h2 className="text-base font-semibold text-slate-900">발송 기록</h2>
-          <span className="tabular text-sm text-slate-400">
-            {history.length}
+          <span className="tabular text-sm text-slate-400">{rows.length}</span>
+          <span className="text-xs text-slate-400">
+            배치가 보낸 것과 손으로 다시 보낸 것을 함께 보여 줍니다.
           </span>
         </div>
-        {history.length === 0 ? (
+        {rows.length === 0 ? (
           <p className="px-5 py-8 text-center text-sm text-slate-400">
             아직 보낸 적이 없습니다.
           </p>
@@ -208,35 +289,25 @@ export default async function NotifySettingsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {history.map((h) => (
-                  <tr key={h.id}>
-                    <td className={`${TD} tabular text-slate-900`}>{h.sentOn}</td>
-                    <td className={`${TD} tabular text-slate-700`}>
-                      {h.targetYm}
-                    </td>
+                {rows.map((row) => (
+                  <tr key={row.key}>
+                    <td className={`${TD} tabular text-slate-900`}>{row.on}</td>
+                    <td className={`${TD} tabular text-slate-700`}>{row.ym}</td>
                     <td className={`${TD} tabular text-slate-600`}>
-                      {h.meterCount}
+                      {row.meters}
                       {t.common.unit}
                     </td>
                     <td className={`${TD} tabular text-slate-600`}>
-                      {h.recipientCount}명
+                      {row.people}명
                     </td>
                     <td className={TD}>
-                      <span
-                        className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                          h.result === "SENT"
-                            ? "bg-emerald-100 text-emerald-800"
-                            : "bg-red-100 text-red-800"
-                        }`}
-                      >
-                        {h.result === "SENT" ? "보냄" : "실패"}
-                      </span>
+                      <span className={`${BADGE} ${row.tone}`}>{row.label}</span>
                     </td>
                     <td
                       className={`${TD} max-w-[22rem] truncate text-slate-500`}
-                      title={h.error ?? ""}
+                      title={row.note}
                     >
-                      {h.error ?? formatDateTime(h.createdAt, lang)}
+                      {row.note}
                     </td>
                   </tr>
                 ))}

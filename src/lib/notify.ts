@@ -43,6 +43,21 @@ export function notifyTargetYm(today: string = currentDate()): string | null {
   return addMonths(today.slice(0, 7), 1);
 }
 
+/**
+ * 지금 기준으로 **다음에 나갈** 기한.
+ *
+ * 1일이면 오늘 나갈 기한 그대로고, 1일이 아닌 날에는 다음 달을 가정한다 —
+ * 설정 화면은 아무 날에나 열리는데 거기에 아무것도 안 적혀 있으면 "무엇이
+ * 나가는지" 를 알 수 없기 때문이다.
+ *
+ * 🔴 설정 화면의 안내 문구와 수동 발송 단추가 **이 함수 하나**를 쓴다. 두
+ * 곳에서 따로 계산하면 화면에 적힌 기한과 실제로 나가는 기한이 어긋날 수
+ * 있는데, 그것은 메일이 나간 뒤에야 드러난다.
+ */
+export function nextNotifyYm(today: string = currentDate()): string {
+  return notifyTargetYm(today) ?? addMonths(today.slice(0, 7), 1);
+}
+
 /** 그 기한에 걸린 계측기들. 자산번호 순. */
 export async function listNotifyTargets(ym: string): Promise<WebMeter[]> {
   return db
